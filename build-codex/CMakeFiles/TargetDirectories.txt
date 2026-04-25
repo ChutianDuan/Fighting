@@ -1,0 +1,8 @@
+/Volumes/拯救者PSSD/Fighting/build-codex/CMakeFiles/rebuild_cache.dir
+/Volumes/拯救者PSSD/Fighting/build-codex/CMakeFiles/test.dir
+/Volumes/拯救者PSSD/Fighting/build-codex/CMakeFiles/lab_stress.dir
+/Volumes/拯救者PSSD/Fighting/build-codex/CMakeFiles/lab_tests.dir
+/Volumes/拯救者PSSD/Fighting/build-codex/CMakeFiles/lab_server.dir
+/Volumes/拯救者PSSD/Fighting/build-codex/CMakeFiles/edit_cache.dir
+/Volumes/拯救者PSSD/Fighting/build-codex/CMakeFiles/lab_client.dir
+/Volumes/拯救者PSSD/Fighting/build-codex/CMakeFiles/lab_core.dir

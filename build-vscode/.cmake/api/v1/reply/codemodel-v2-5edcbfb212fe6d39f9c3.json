@@ -1,0 +1,96 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"jsonFile" : "directory-.-Debug-f5ebdc15457944623624.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.20"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "fighter_netcode_demo",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "lab_client::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-lab_client-Debug-35d21f2c108ef32eff0a.json",
+					"name" : "lab_client",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "lab_core::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-lab_core-Debug-fc49dd4837dcad35ae54.json",
+					"name" : "lab_core",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "lab_server::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-lab_server-Debug-01bb8ffcc7a5a85a8058.json",
+					"name" : "lab_server",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "lab_stress::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-lab_stress-Debug-79eb4f910b4c5308b653.json",
+					"name" : "lab_stress",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "lab_tests::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-lab_tests-Debug-6f4e4e097ae9897f5ea4.json",
+					"name" : "lab_tests",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "/Volumes/拯救者PSSD/Fighting/build-vscode",
+		"source" : "/Volumes/拯救者PSSD/Fighting"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 3
+	}
+}

@@ -1,0 +1,35 @@
+Start testing: Apr 24 17:43 CST
+----------------------------------------------------------
+1/2 Testing: lab_tests
+1/2 Test: lab_tests
+Command: "/Volumes/拯救者PSSD/桌面/Fighting/build-vscode/lab_tests"
+Directory: /Volumes/拯救者PSSD/桌面/Fighting/build-vscode
+"lab_tests" start time: Apr 24 17:43 CST
+Output:
+----------------------------------------------------------
+core_tests OK
+<end of output>
+Test time =   0.36 sec
+----------------------------------------------------------
+Test Passed.
+"lab_tests" end time: Apr 24 17:43 CST
+"lab_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/2 Testing: lab_stress_smoke
+2/2 Test: lab_stress_smoke
+Command: "/Volumes/拯救者PSSD/桌面/Fighting/build-vscode/lab_stress" "--ticks" "3000" "--history" "512" "--state-delay" "5"
+Directory: /Volumes/拯救者PSSD/桌面/Fighting/build-vscode
+"lab_stress_smoke" start time: Apr 24 17:43 CST
+Output:
+----------------------------------------------------------
+stress OK ticks=3000 players=2 inputPackets=6000 statePackets=1500 bytes=663042 replays=1498 replayedTicks=8987 hashChecks=1498 rawRestoreChecks=1498 timeSec=0.421573 ticksPerSec=7116.2
+<end of output>
+Test time =   0.84 sec
+----------------------------------------------------------
+Test Passed.
+"lab_stress_smoke" end time: Apr 24 17:43 CST
+"lab_stress_smoke" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Apr 24 17:43 CST

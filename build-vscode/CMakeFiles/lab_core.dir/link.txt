@@ -1,0 +1,2 @@
+/Library/Developer/CommandLineTools/usr/bin/ar qc liblab_core.a CMakeFiles/lab_core.dir/src/time/Clock.cpp.o CMakeFiles/lab_core.dir/src/sim/InputBuffer.cpp.o CMakeFiles/lab_core.dir/src/sim/World.cpp.o CMakeFiles/lab_core.dir/src/sim/Hasher.cpp.o CMakeFiles/lab_core.dir/src/net/NetStub.cpp.o CMakeFiles/lab_core.dir/src/net/NetCode.cpp.o CMakeFiles/lab_core.dir/src/net/UdpSocket.cpp.o CMakeFiles/lab_core.dir/src/io/RecordReplay.cpp.o CMakeFiles/lab_core.dir/src/core/FixedTimestepRunner.cpp.o
+/Library/Developer/CommandLineTools/usr/bin/ranlib liblab_core.a

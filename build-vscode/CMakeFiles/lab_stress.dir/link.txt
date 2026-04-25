@@ -1,0 +1,1 @@
+/Library/Developer/CommandLineTools/usr/bin/c++ -g -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX15.5.sdk -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/lab_stress.dir/tests/stress_tests.cpp.o -o lab_stress  -Wl,-rpath,/Volumes/拯救者PSSD/opt/miniconda3/lib liblab_core.a /Volumes/拯救者PSSD/opt/miniconda3/lib/libevent.dylib 

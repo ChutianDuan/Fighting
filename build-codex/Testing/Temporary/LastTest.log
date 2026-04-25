@@ -1,0 +1,35 @@
+Start testing: Apr 25 14:22 CST
+----------------------------------------------------------
+1/2 Testing: lab_tests
+1/2 Test: lab_tests
+Command: "/Volumes/拯救者PSSD/Fighting/build-codex/lab_tests"
+Directory: /Volumes/拯救者PSSD/Fighting/build-codex
+"lab_tests" start time: Apr 25 14:22 CST
+Output:
+----------------------------------------------------------
+core_tests OK
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"lab_tests" end time: Apr 25 14:22 CST
+"lab_tests" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/2 Testing: lab_stress_smoke
+2/2 Test: lab_stress_smoke
+Command: "/Volumes/拯救者PSSD/Fighting/build-codex/lab_stress" "--ticks" "3000" "--history" "512" "--state-delay" "5"
+Directory: /Volumes/拯救者PSSD/Fighting/build-codex
+"lab_stress_smoke" start time: Apr 25 14:22 CST
+Output:
+----------------------------------------------------------
+stress OK ticks=3000 players=2 inputPackets=6000 statePackets=1500 bytes=663042 replays=1498 replayedTicks=8987 hashChecks=1498 rawRestoreChecks=1498 timeSec=0.437049 ticksPerSec=6864.22
+<end of output>
+Test time =   0.44 sec
+----------------------------------------------------------
+Test Passed.
+"lab_stress_smoke" end time: Apr 25 14:22 CST
+"lab_stress_smoke" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Apr 25 14:22 CST

@@ -1,0 +1,1 @@
+/Library/Developer/CommandLineTools/usr/bin/c++  -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX15.5.sdk -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/lab_server.dir/apps/server_main.cpp.o -o lab_server  -Wl,-rpath,/Volumes/拯救者PSSD/opt/miniconda3/lib liblab_core.a /Volumes/拯救者PSSD/opt/miniconda3/lib/libevent.dylib 

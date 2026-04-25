@@ -1,0 +1,77 @@
+[
+{
+  "directory": "/Volumes/拯救者PSSD/Fighting/build-vscode",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++  -I/Volumes/拯救者PSSD/Fighting/include -isystem /Volumes/拯救者PSSD/opt/miniconda3/include -g -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX15.5.sdk -Wall -Wextra -Wpedantic -std=c++2a -o CMakeFiles/lab_core.dir/src/time/Clock.cpp.o -c /Volumes/拯救者PSSD/Fighting/src/time/Clock.cpp",
+  "file": "/Volumes/拯救者PSSD/Fighting/src/time/Clock.cpp"
+},
+{
+  "directory": "/Volumes/拯救者PSSD/Fighting/build-vscode",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++  -I/Volumes/拯救者PSSD/Fighting/include -isystem /Volumes/拯救者PSSD/opt/miniconda3/include -g -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX15.5.sdk -Wall -Wextra -Wpedantic -std=c++2a -o CMakeFiles/lab_core.dir/src/sim/InputBuffer.cpp.o -c /Volumes/拯救者PSSD/Fighting/src/sim/InputBuffer.cpp",
+  "file": "/Volumes/拯救者PSSD/Fighting/src/sim/InputBuffer.cpp"
+},
+{
+  "directory": "/Volumes/拯救者PSSD/Fighting/build-vscode",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++  -I/Volumes/拯救者PSSD/Fighting/include -isystem /Volumes/拯救者PSSD/opt/miniconda3/include -g -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX15.5.sdk -Wall -Wextra -Wpedantic -std=c++2a -o CMakeFiles/lab_core.dir/src/sim/World.cpp.o -c /Volumes/拯救者PSSD/Fighting/src/sim/World.cpp",
+  "file": "/Volumes/拯救者PSSD/Fighting/src/sim/World.cpp"
+},
+{
+  "directory": "/Volumes/拯救者PSSD/Fighting/build-vscode",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++  -I/Volumes/拯救者PSSD/Fighting/include -isystem /Volumes/拯救者PSSD/opt/miniconda3/include -g -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX15.5.sdk -Wall -Wextra -Wpedantic -std=c++2a -o CMakeFiles/lab_core.dir/src/sim/Hasher.cpp.o -c /Volumes/拯救者PSSD/Fighting/src/sim/Hasher.cpp",
+  "file": "/Volumes/拯救者PSSD/Fighting/src/sim/Hasher.cpp"
+},
+{
+  "directory": "/Volumes/拯救者PSSD/Fighting/build-vscode",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++  -I/Volumes/拯救者PSSD/Fighting/include -isystem /Volumes/拯救者PSSD/opt/miniconda3/include -g -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX15.5.sdk -Wall -Wextra -Wpedantic -std=c++2a -o CMakeFiles/lab_core.dir/src/net/NetStub.cpp.o -c /Volumes/拯救者PSSD/Fighting/src/net/NetStub.cpp",
+  "file": "/Volumes/拯救者PSSD/Fighting/src/net/NetStub.cpp"
+},
+{
+  "directory": "/Volumes/拯救者PSSD/Fighting/build-vscode",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++  -I/Volumes/拯救者PSSD/Fighting/include -isystem /Volumes/拯救者PSSD/opt/miniconda3/include -g -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX15.5.sdk -Wall -Wextra -Wpedantic -std=c++2a -o CMakeFiles/lab_core.dir/src/net/NetCode.cpp.o -c /Volumes/拯救者PSSD/Fighting/src/net/NetCode.cpp",
+  "file": "/Volumes/拯救者PSSD/Fighting/src/net/NetCode.cpp"
+},
+{
+  "directory": "/Volumes/拯救者PSSD/Fighting/build-vscode",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++  -I/Volumes/拯救者PSSD/Fighting/include -isystem /Volumes/拯救者PSSD/opt/miniconda3/include -g -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX15.5.sdk -Wall -Wextra -Wpedantic -std=c++2a -o CMakeFiles/lab_core.dir/src/net/UdpSocket.cpp.o -c /Volumes/拯救者PSSD/Fighting/src/net/UdpSocket.cpp",
+  "file": "/Volumes/拯救者PSSD/Fighting/src/net/UdpSocket.cpp"
+},
+{
+  "directory": "/Volumes/拯救者PSSD/Fighting/build-vscode",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++  -I/Volumes/拯救者PSSD/Fighting/include -isystem /Volumes/拯救者PSSD/opt/miniconda3/include -g -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX15.5.sdk -Wall -Wextra -Wpedantic -std=c++2a -o CMakeFiles/lab_core.dir/src/io/RecordReplay.cpp.o -c /Volumes/拯救者PSSD/Fighting/src/io/RecordReplay.cpp",
+  "file": "/Volumes/拯救者PSSD/Fighting/src/io/RecordReplay.cpp"
+},
+{
+  "directory": "/Volumes/拯救者PSSD/Fighting/build-vscode",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++  -I/Volumes/拯救者PSSD/Fighting/include -isystem /Volumes/拯救者PSSD/opt/miniconda3/include -g -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX15.5.sdk -Wall -Wextra -Wpedantic -std=c++2a -o CMakeFiles/lab_core.dir/src/core/FixedTimestepRunner.cpp.o -c /Volumes/拯救者PSSD/Fighting/src/core/FixedTimestepRunner.cpp",
+  "file": "/Volumes/拯救者PSSD/Fighting/src/core/FixedTimestepRunner.cpp"
+},
+{
+  "directory": "/Volumes/拯救者PSSD/Fighting/build-vscode",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++  -I/Volumes/拯救者PSSD/Fighting/include -isystem /Volumes/拯救者PSSD/opt/miniconda3/include -g -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX15.5.sdk -Wall -Wextra -Wpedantic -std=c++2a -o CMakeFiles/lab_stress.dir/tests/stress_tests.cpp.o -c /Volumes/拯救者PSSD/Fighting/tests/stress_tests.cpp",
+  "file": "/Volumes/拯救者PSSD/Fighting/tests/stress_tests.cpp"
+},
+{
+  "directory": "/Volumes/拯救者PSSD/Fighting/build-vscode",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++  -I/Volumes/拯救者PSSD/Fighting/include -isystem /Volumes/拯救者PSSD/opt/miniconda3/include -g -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX15.5.sdk -Wall -Wextra -Wpedantic -std=c++2a -o CMakeFiles/lab_tests.dir/tests/core_tests.cpp.o -c /Volumes/拯救者PSSD/Fighting/tests/core_tests.cpp",
+  "file": "/Volumes/拯救者PSSD/Fighting/tests/core_tests.cpp"
+},
+{
+  "directory": "/Volumes/拯救者PSSD/Fighting/build-vscode",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++  -I/Volumes/拯救者PSSD/Fighting/include -isystem /Volumes/拯救者PSSD/opt/miniconda3/include -g -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX15.5.sdk -Wall -Wextra -Wpedantic -std=c++2a -o CMakeFiles/lab_server.dir/apps/server_main.cpp.o -c /Volumes/拯救者PSSD/Fighting/apps/server_main.cpp",
+  "file": "/Volumes/拯救者PSSD/Fighting/apps/server_main.cpp"
+},
+{
+  "directory": "/Volumes/拯救者PSSD/Fighting/build-vscode",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++  -I/Volumes/拯救者PSSD/Fighting/include -isystem /Volumes/拯救者PSSD/opt/miniconda3/include -isystem /Volumes/拯救者PSSD/opt/miniconda3/include/SDL2 -g -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX15.5.sdk -Wall -Wextra -Wpedantic -std=c++2a -o CMakeFiles/lab_client.dir/apps/client_main.cpp.o -c /Volumes/拯救者PSSD/Fighting/apps/client_main.cpp",
+  "file": "/Volumes/拯救者PSSD/Fighting/apps/client_main.cpp"
+},
+{
+  "directory": "/Volumes/拯救者PSSD/Fighting/build-vscode",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++  -I/Volumes/拯救者PSSD/Fighting/include -isystem /Volumes/拯救者PSSD/opt/miniconda3/include -isystem /Volumes/拯救者PSSD/opt/miniconda3/include/SDL2 -g -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX15.5.sdk -Wall -Wextra -Wpedantic -std=c++2a -o CMakeFiles/lab_client.dir/src/app/InputPrediction.cpp.o -c /Volumes/拯救者PSSD/Fighting/src/app/InputPrediction.cpp",
+  "file": "/Volumes/拯救者PSSD/Fighting/src/app/InputPrediction.cpp"
+},
+{
+  "directory": "/Volumes/拯救者PSSD/Fighting/build-vscode",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++  -I/Volumes/拯救者PSSD/Fighting/include -isystem /Volumes/拯救者PSSD/opt/miniconda3/include -isystem /Volumes/拯救者PSSD/opt/miniconda3/include/SDL2 -g -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX15.5.sdk -Wall -Wextra -Wpedantic -std=c++2a -o CMakeFiles/lab_client.dir/src/app/ClientRender.cpp.o -c /Volumes/拯救者PSSD/Fighting/src/app/ClientRender.cpp",
+  "file": "/Volumes/拯救者PSSD/Fighting/src/app/ClientRender.cpp"
+}
+]
