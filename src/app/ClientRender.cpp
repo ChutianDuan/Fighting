@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iomanip>
+#include <sstream>
 #include <string>
 #include <utility>
 
@@ -44,7 +46,8 @@ void ShutdownRenderer(RenderCtx& rc) {
 void RenderFrame(RenderCtx& rc,
                  const WorldSnapshot& snap,
                  uint32_t rollbackCount,
-                 uint32_t hashMismatchCount) {
+                 uint32_t hashMismatchCount,
+                 const NetworkStats* netStats) {
   if (!rc.renderer) return;
 
   SDL_SetRenderDrawColor(rc.renderer, 20, 20, 30, 255);
@@ -101,6 +104,12 @@ void RenderFrame(RenderCtx& rc,
   }
 
   if (rc.font) {
+    auto fixed1 = [](double value) {
+      std::ostringstream oss;
+      oss << std::fixed << std::setprecision(1) << value;
+      return oss.str();
+    };
+
     auto drawText = [&](int x, int y, const std::string& text) {
       SDL_Color color{220, 220, 220, 255};
       int w=0, h=0;
@@ -123,6 +132,18 @@ void RenderFrame(RenderCtx& rc,
                          " act=" + ActionName(p.action) +
                          " t=" + std::to_string(p.stateTimer);
       drawText(10, 90 + int(i) * 20, line);
+    }
+
+    if (netStats) {
+      const int x = std::max(10, rc.width - 275);
+      drawText(x, 10, "rtt: " + fixed1(netStats->rttMs) + " ms");
+      drawText(x, 30, "loss: " + fixed1(netStats->packetLossPct) + "%");
+      drawText(x, 50, "lead: " + std::to_string(netStats->inputLeadTicks) + " ticks");
+      drawText(x, 70, "state delay: " + std::to_string(netStats->stateDelayTicks) + " ticks");
+      drawText(x, 90, "replay: " + std::to_string(netStats->replayTicks) +
+                         " ticks / " + fixed1(netStats->replayCostMs) + " ms");
+      drawText(x, 110, "input pkts: " + std::to_string(netStats->inputPacketsReceived) +
+                          " recv / " + std::to_string(netStats->inputPacketsLost) + " lost");
     }
   }
 

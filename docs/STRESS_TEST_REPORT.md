@@ -5,6 +5,8 @@
 构建目录：`build-codex`  
 测试目标：`lab_tests`、`lab_stress`
 
+指标口径：输入包、状态包、网络字节、回滚次数、重放 tick、哈希校验、raw restore 校验和 TPS 的含义见 [性能指标监控与指标测试](PERFORMANCE_METRICS.md)。
+
 ## 测试范围
 
 本次测试使用仓库内 `tests/stress_tests.cpp` 提供的压力测试脚本，覆盖以下行为：

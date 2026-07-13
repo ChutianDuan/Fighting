@@ -111,6 +111,17 @@ bool UdpSocket::RecvFrom(UdpAddr& from, std::vector<uint8_t>& out) {
   return true;
 }
 
+uint16_t UdpSocket::LocalPort() const {
+  if (fd_ < 0) return 0;
+
+  sockaddr_in a{};
+  socklen_t len = sizeof(a);
+  if (::getsockname(fd_, reinterpret_cast<sockaddr*>(&a), &len) != 0) {
+    return 0;
+  }
+  return ntohs(a.sin_port);
+}
+
 // ---------------- libevent ----------------
 
 bool UdpSocket::StartEventRead(event_base* base, OnDatagramFn fn, void* user) {

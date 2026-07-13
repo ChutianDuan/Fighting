@@ -88,6 +88,8 @@ std::vector<uint8_t> EncodeInput(const InputPacket& p) {
   WriteU8(b, p.playerId);
   WriteU8(b, count);
   WriteU16(b, 0);
+  WriteU64(b, p.sessionId);
+  WriteU32(b, p.matchId);
   WriteU32(b, p.seq);
   WriteU32(b, p.newestTick);
   WriteU32(b, p.clientAckServerTick);
@@ -105,14 +107,19 @@ std::vector<uint8_t> EncodeInput(const InputPacket& p) {
 
 std::vector<uint8_t> EncodeAck(const AckPacket& p) {
   std::vector<uint8_t> b;
-  b.reserve(64);
+  b.reserve(76);
   WriteHeader(b, PacketType::Ack);
 
   WriteU8(b, p.playerId);
   WriteU8(b, 0); WriteU8(b, 0); WriteU8(b, 0);
+  WriteU64(b, p.sessionId);
+  WriteU32(b, p.matchId);
   WriteU32(b, p.serverTickProcessed);
   WriteU32(b, p.serverLastInputTick);
   WriteU64(b, p.serverStateHash);
+  WriteU32(b, p.serverRecvInputSeq);
+  WriteU32(b, p.serverInputPacketsReceived);
+  WriteU32(b, p.serverInputPacketsLost);
   return b;
 }
 
@@ -127,6 +134,8 @@ std::optional<InputPacket> DecodeInput(const uint8_t* data, size_t len) {
   if (!ReadU8(p, end, out.playerId)) return std::nullopt;
   if (!ReadU8(p, end, out.count)) return std::nullopt;
   if (!ReadU16(p, end, rsv)) return std::nullopt;
+  if (!ReadU64(p, end, out.sessionId)) return std::nullopt;
+  if (!ReadU32(p, end, out.matchId)) return std::nullopt;
   if (!ReadU32(p, end, out.seq)) return std::nullopt;
   if (!ReadU32(p, end, out.newestTick)) return std::nullopt;
   if (!ReadU32(p, end, out.clientAckServerTick)) return std::nullopt;
@@ -152,7 +161,7 @@ std::optional<InputPacket> DecodeInput(const uint8_t* data, size_t len) {
     c.moveY = moveY;
     out.cmds.push_back(c);
   }
-  return out;
+  return p == end ? std::optional<InputPacket>(std::move(out)) : std::nullopt;
 }
 
 std::optional<AckPacket> DecodeAck(const uint8_t* data, size_t len) {
@@ -167,11 +176,16 @@ std::optional<AckPacket> DecodeAck(const uint8_t* data, size_t len) {
   if (!ReadU8(p, end, dummy)) return std::nullopt;
   if (!ReadU8(p, end, dummy)) return std::nullopt;
   if (!ReadU8(p, end, dummy)) return std::nullopt;
+  if (!ReadU64(p, end, out.sessionId)) return std::nullopt;
+  if (!ReadU32(p, end, out.matchId)) return std::nullopt;
 
   if (!ReadU32(p, end, out.serverTickProcessed)) return std::nullopt;
   if (!ReadU32(p, end, out.serverLastInputTick)) return std::nullopt;
   if (!ReadU64(p, end, out.serverStateHash)) return std::nullopt;
-  return out;
+  if (!ReadU32(p, end, out.serverRecvInputSeq)) return std::nullopt;
+  if (!ReadU32(p, end, out.serverInputPacketsReceived)) return std::nullopt;
+  if (!ReadU32(p, end, out.serverInputPacketsLost)) return std::nullopt;
+  return p == end ? std::optional<AckPacket>(out) : std::nullopt;
 }
 static void WriteI16(std::vector<uint8_t>& b, int16_t v) {
   uint16_t u = htons(static_cast<uint16_t>(v));
@@ -213,6 +227,8 @@ std::vector<uint8_t> EncodeState(const StatePacket& s) {
   WriteU8(b, count);
   WriteU8(b, projCount);
   WriteU8(b, 0);
+  WriteU64(b, s.sessionId);
+  WriteU32(b, s.matchId);
   WriteU32(b, s.tick);
   WriteU32(b, s.mazeSeed);
 
@@ -255,7 +271,26 @@ std::vector<uint8_t> EncodeStart(const StartPacket& s) {
   WriteU8(b, s.playerId);
   WriteU8(b, s.totalPlayers);
   WriteU16(b, 0);
+  WriteU64(b, s.sessionId);
+  WriteU32(b, s.matchId);
   WriteU32(b, s.startTick);
+  WriteU32(b, s.mazeSeed);
+  const size_t mazeCells = std::min<size_t>(s.maze.size(), 4096);
+  WriteU16(b, static_cast<uint16_t>(s.mazeWidth));
+  WriteU16(b, static_cast<uint16_t>(s.mazeHeight));
+  WriteU16(b, static_cast<uint16_t>(mazeCells));
+  b.insert(b.end(), s.maze.begin(), s.maze.begin() + mazeCells);
+  return b;
+}
+
+std::vector<uint8_t> EncodeReset(const ResetPacket& s) {
+  std::vector<uint8_t> b;
+  b.reserve(24);
+  WriteHeader(b, PacketType::Reset);
+  WriteU8(b, s.playerId);
+  WriteU8(b, 0); WriteU8(b, 0); WriteU8(b, 0);
+  WriteU64(b, s.sessionId);
+  WriteU32(b, s.matchId);
   return b;
 }
 
@@ -275,6 +310,8 @@ std::optional<StatePacket> DecodeState(const uint8_t* data, size_t len) {
   if (!ReadU8(p, end, projCount)) return std::nullopt;
   if (!ReadU8(p, end, dummy8)) return std::nullopt;
   s.projectileCount = projCount;
+  if (!ReadU64(p, end, s.sessionId)) return std::nullopt;
+  if (!ReadU32(p, end, s.matchId)) return std::nullopt;
 
   if (!ReadU32(p, end, s.tick)) return std::nullopt;
   if (!ReadU32(p, end, s.mazeSeed)) return std::nullopt;
@@ -315,7 +352,7 @@ std::optional<StatePacket> DecodeState(const uint8_t* data, size_t len) {
 
   if (!ReadU64(p, end, s.stateHash)) return std::nullopt;
 
-  return s;
+  return p == end ? std::optional<StatePacket>(std::move(s)) : std::nullopt;
 }
 
 std::optional<StartPacket> DecodeStart(const uint8_t* data, size_t len) {
@@ -330,7 +367,38 @@ std::optional<StartPacket> DecodeStart(const uint8_t* data, size_t len) {
   if (!ReadU8(p, end, s.playerId)) return std::nullopt;
   if (!ReadU8(p, end, s.totalPlayers)) return std::nullopt;
   if (!ReadU16(p, end, dummy16)) return std::nullopt;
+  if (!ReadU64(p, end, s.sessionId)) return std::nullopt;
+  if (!ReadU32(p, end, s.matchId)) return std::nullopt;
   if (!ReadU32(p, end, s.startTick)) return std::nullopt;
+  if (!ReadU32(p, end, s.mazeSeed)) return std::nullopt;
+  uint16_t mazeWidth = 0;
+  uint16_t mazeHeight = 0;
+  uint16_t mazeCells = 0;
+  if (!ReadU16(p, end, mazeWidth)) return std::nullopt;
+  if (!ReadU16(p, end, mazeHeight)) return std::nullopt;
+  if (!ReadU16(p, end, mazeCells)) return std::nullopt;
+  if (mazeCells > 4096 || size_t(end - p) != mazeCells) return std::nullopt;
+  if (size_t(mazeWidth) * size_t(mazeHeight) != mazeCells) return std::nullopt;
+  s.mazeWidth = mazeWidth;
+  s.mazeHeight = mazeHeight;
+  s.maze.assign(p, end);
   return s;
+}
+
+std::optional<ResetPacket> DecodeReset(const uint8_t* data, size_t len) {
+  const uint8_t* p = data;
+  const uint8_t* end = data + len;
+  PacketType t;
+  if (!ReadHeader(p, end, t) || t != PacketType::Reset) return std::nullopt;
+
+  ResetPacket s;
+  uint8_t dummy = 0;
+  if (!ReadU8(p, end, s.playerId)) return std::nullopt;
+  if (!ReadU8(p, end, dummy)) return std::nullopt;
+  if (!ReadU8(p, end, dummy)) return std::nullopt;
+  if (!ReadU8(p, end, dummy)) return std::nullopt;
+  if (!ReadU64(p, end, s.sessionId)) return std::nullopt;
+  if (!ReadU32(p, end, s.matchId)) return std::nullopt;
+  return p == end ? std::optional<ResetPacket>(s) : std::nullopt;
 }
 } // namespace lab::net

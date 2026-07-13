@@ -1,3 +1,0 @@
-lab_tests 2 0.00332221
-lab_stress_smoke 2 0.221637
----

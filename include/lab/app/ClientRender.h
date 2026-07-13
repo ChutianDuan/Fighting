@@ -17,11 +17,23 @@ struct RenderCtx {
   int height = 600;
 };
 
+struct NetworkStats {
+  double rttMs = 0.0;
+  double packetLossPct = 0.0;
+  int32_t inputLeadTicks = 0;
+  int32_t stateDelayTicks = 0;
+  double replayCostMs = 0.0;
+  uint32_t replayTicks = 0;
+  uint32_t inputPacketsReceived = 0;
+  uint32_t inputPacketsLost = 0;
+};
+
 bool InitRenderer(RenderCtx& rc, const std::string& title, const std::string& fontPath, int fontSize);
 void ShutdownRenderer(RenderCtx& rc);
 void RenderFrame(RenderCtx& rc,
                  const WorldSnapshot& snap,
                  uint32_t rollbackCount,
-                 uint32_t hashMismatchCount);
+                 uint32_t hashMismatchCount,
+                 const NetworkStats* netStats = nullptr);
 
 } // namespace lab::app

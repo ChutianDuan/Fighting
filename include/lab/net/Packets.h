@@ -8,13 +8,14 @@
 namespace lab::net {
 
 constexpr uint32_t kMagic = 0x4C414230u; // 'LAB0'
-constexpr uint16_t kVersion = 3;
+constexpr uint16_t kVersion = 5;
 
 enum class PacketType : uint16_t {
   Input = 1,
   Ack   = 2,
   State = 3,
   Start = 4,
+  Reset = 5,
 };
 
 #pragma pack(push, 1)
@@ -56,6 +57,8 @@ struct InputPacket {
   uint8_t  playerId = 1;
   uint8_t  count = 0;            // cmd 数量
   uint16_t reserved = 0;
+  uint64_t sessionId = 0;        // Start 分配；hello 阶段为 0
+  uint32_t matchId = 0;          // 未进入比赛时为 0
   uint32_t seq = 0;              // 输入序号，用于检测丢包
   Tick newestTick = 0; // 本包最新 tick
   Tick clientAckServerTick = 0; // 客户端确认的 server tick（预留给后续回滚/状态）
@@ -66,9 +69,14 @@ struct InputPacket {
 struct AckPacket {
   uint8_t  playerId = 1;
   uint8_t  reserved[3] = {0,0,0};
+  uint64_t sessionId = 0;
+  uint32_t matchId = 0;
   Tick serverTickProcessed = 0;   // server 权威推进到的 tick
   Tick serverLastInputTick = 0;   // server 已收到该 client 的最大输入 tick
   uint64_t serverStateHash = 0;             // 可选：debug 用（一致性/分叉定位）
+  uint32_t serverRecvInputSeq = 0;           // server 已收到该 client 的最新 input packet seq
+  uint32_t serverInputPacketsReceived = 0;   // 累计收到的 input packet 数（不含 hello）
+  uint32_t serverInputPacketsLost = 0;       // 基于 seq gap 的累计丢包估计
 };
 
 struct StatePacket{
@@ -76,6 +84,8 @@ struct StatePacket{
   uint8_t playerCount = 0; // 有效玩家数量
   uint8_t projectileCount = 0;
   uint8_t reserved = 0;
+  uint64_t sessionId = 0;
+  uint32_t matchId = 0;
   Tick tick = 0;
   std::vector<PackedPlayerState> players;
   std::vector<PackedProjectile> projectiles;
@@ -87,7 +97,20 @@ struct StartPacket {
   uint8_t playerId = 1;
   uint8_t totalPlayers = 2;
   uint16_t reserved = 0;
+  uint64_t sessionId = 0;
+  uint32_t matchId = 0;
   Tick startTick = 0;
+  uint32_t mazeSeed = 0;
+  uint16_t mazeWidth = 0;
+  uint16_t mazeHeight = 0;
+  std::vector<uint8_t> maze;
+};
+
+struct ResetPacket {
+  uint8_t playerId = 1;
+  uint8_t reserved[3] = {0,0,0};
+  uint64_t sessionId = 0;
+  uint32_t matchId = 0;
 };
 
 } // namespace lab::net

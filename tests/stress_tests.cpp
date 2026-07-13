@@ -10,10 +10,14 @@
 #include <cstdint>
 #include <cstdlib>
 #include <deque>
+#include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <stdexcept>
 #include <string>
 #include <vector>
+
+#include "performance/PerfStats.h"
 
 namespace {
 
@@ -24,6 +28,7 @@ struct Options {
   Tick stateEvery = 2;
   Tick stateDelay = 7;
   int redundancy = 8;
+  std::string jsonPath;
 };
 
 struct PendingState {
@@ -61,7 +66,7 @@ size_t ParseSize(const char* value, const char* name) {
 void PrintUsage(const char* argv0) {
   std::cout
       << "Usage: " << argv0 << " [--ticks N] [--players N] [--history N]\n"
-      << "       [--state-every N] [--state-delay N] [--redundancy N]\n";
+      << "       [--state-every N] [--state-delay N] [--redundancy N] [--json PATH]\n";
 }
 
 Options ParseOptions(int argc, char** argv) {
@@ -92,6 +97,8 @@ Options ParseOptions(int argc, char** argv) {
       const uint32_t redundancy = ParseU32(needValue("--redundancy"), "--redundancy");
       Require(redundancy >= 1 && redundancy <= 255, "--redundancy must be in [1, 255]");
       opt.redundancy = static_cast<int>(redundancy);
+    } else if (arg == "--json") {
+      opt.jsonPath = needValue("--json");
     } else {
       Fail("unknown argument: " + arg);
     }
@@ -101,6 +108,18 @@ Options ParseOptions(int argc, char** argv) {
   Require(opt.history > opt.stateDelay + 16, "--history must be larger than replay delay window");
   Require(opt.stateEvery > 0, "--state-every must be > 0");
   return opt;
+}
+
+void WriteDistribution(std::ostream& output, const lab::perf::Distribution& value) {
+  output << "{\"samples\":" << value.samples
+         << ",\"mean\":" << value.mean
+         << ",\"stddev\":" << value.stddev
+         << ",\"p50\":" << value.p50
+         << ",\"p95\":" << value.p95
+         << ",\"p99\":" << value.p99
+         << ",\"p999\":" << value.p999
+         << ",\"max\":" << value.maximum
+         << ",\"jitterP99P50\":" << value.jitterP99P50 << "}";
 }
 
 InputCmd MakeCmd(Tick tick, uint8_t playerIndex) {
@@ -322,10 +341,19 @@ int main(int argc, char** argv) {
   uint64_t replayedTicks = 0;
   uint64_t hashChecks = 0;
   uint64_t rawRestoreChecks = 0;
+  std::vector<double> tickLatencyMs;
+  std::vector<double> stateEncodeLatencyMs;
+  std::vector<double> stateDecodeLatencyMs;
+  std::vector<double> replayLatencyMs;
+  tickLatencyMs.reserve(opt.ticks);
+  stateEncodeLatencyMs.reserve(opt.ticks / opt.stateEvery + 1);
+  stateDecodeLatencyMs.reserve(opt.ticks / opt.stateEvery + 1);
+  replayLatencyMs.reserve(opt.ticks / opt.stateEvery + 1);
 
   const auto started = std::chrono::steady_clock::now();
 
   for (Tick tick = 0; tick < opt.ticks; ++tick) {
+    const auto tickStarted = lab::perf::Clock::now();
     std::vector<InputCmd> truthCmds;
     std::vector<InputCmd> predictedCmds;
     truthCmds.reserve(opt.players);
@@ -352,8 +380,11 @@ int main(int argc, char** argv) {
     clientHistory.Put(client.Snapshot());
 
     if (tick % opt.stateEvery == 0) {
+      const auto encodeStarted = lab::perf::Clock::now();
       const lab::net::StatePacket st = SnapshotToState(authoritySnap, 1);
       const auto bytes = lab::net::EncodeState(st);
+      stateEncodeLatencyMs.push_back(
+          lab::perf::Milliseconds(lab::perf::Clock::now() - encodeStarted));
       const Tick jitter = (tick / opt.stateEvery) % 3;
       pendingStates.push_back(PendingState{tick + opt.stateDelay + jitter, bytes});
       statePackets++;
@@ -364,7 +395,10 @@ int main(int argc, char** argv) {
       const auto bytes = pendingStates.front().bytes;
       pendingStates.pop_front();
 
+      const auto decodeStarted = lab::perf::Clock::now();
       const auto decoded = lab::net::DecodeState(bytes.data(), bytes.size());
+      stateDecodeLatencyMs.push_back(
+          lab::perf::Milliseconds(lab::perf::Clock::now() - decodeStarted));
       Require(decoded.has_value(), "DecodeState failed at tick " + std::to_string(tick));
 
       const WorldSnapshot auth = StateToSnapshot(*decoded, opt.players);
@@ -385,7 +419,10 @@ int main(int argc, char** argv) {
       }
       rawRestoreChecks++;
 
+      const auto replayStarted = lab::perf::Clock::now();
       const WorldSnapshot clientSnap = ReplayFrom(client, auth, tick, truthHistory, clientHistory);
+      replayLatencyMs.push_back(
+          lab::perf::Milliseconds(lab::perf::Clock::now() - replayStarted));
       replays++;
       replayedTicks += tick - auth.tick;
 
@@ -404,11 +441,17 @@ int main(int argc, char** argv) {
              " expected=" + std::to_string(authorityHash));
       }
     }
+    tickLatencyMs.push_back(
+        lab::perf::Milliseconds(lab::perf::Clock::now() - tickStarted));
   }
 
   const auto finished = std::chrono::steady_clock::now();
   const double seconds = std::chrono::duration<double>(finished - started).count();
   const double ticksPerSecond = seconds > 0.0 ? double(opt.ticks) / seconds : 0.0;
+  const auto tickDistribution = lab::perf::Summarize(std::move(tickLatencyMs));
+  const auto stateEncodeDistribution = lab::perf::Summarize(std::move(stateEncodeLatencyMs));
+  const auto stateDecodeDistribution = lab::perf::Summarize(std::move(stateDecodeLatencyMs));
+  const auto replayDistribution = lab::perf::Summarize(std::move(replayLatencyMs));
 
   std::cout << "stress OK"
             << " ticks=" << opt.ticks
@@ -422,7 +465,41 @@ int main(int argc, char** argv) {
             << " rawRestoreChecks=" << rawRestoreChecks
             << " timeSec=" << seconds
             << " ticksPerSec=" << ticksPerSecond
+            << " tickP99Ms=" << tickDistribution.p99
+            << " stateEncodeP99Ms=" << stateEncodeDistribution.p99
+            << " stateDecodeP99Ms=" << stateDecodeDistribution.p99
+            << " replayP99Ms=" << replayDistribution.p99
             << "\n";
+
+  if (!opt.jsonPath.empty()) {
+    std::ofstream output(opt.jsonPath);
+    Require(bool(output), "cannot open JSON output: " + opt.jsonPath);
+    output << std::fixed << std::setprecision(6)
+           << "{\"schemaVersion\":1,\"ticks\":" << opt.ticks
+           << ",\"players\":" << int(opt.players)
+           << ",\"history\":" << opt.history
+           << ",\"stateEvery\":" << opt.stateEvery
+           << ",\"stateDelay\":" << opt.stateDelay
+           << ",\"redundancy\":" << opt.redundancy
+           << ",\"timeSec\":" << seconds
+           << ",\"ticksPerSec\":" << ticksPerSecond
+           << ",\"inputPackets\":" << inputPackets
+           << ",\"statePackets\":" << statePackets
+           << ",\"networkBytes\":" << networkBytes
+           << ",\"replays\":" << replays
+           << ",\"replayedTicks\":" << replayedTicks
+           << ",\"hashChecks\":" << hashChecks
+           << ",\"rawRestoreChecks\":" << rawRestoreChecks
+           << ",\"tickMs\":";
+    WriteDistribution(output, tickDistribution);
+    output << ",\"stateEncodeMs\":";
+    WriteDistribution(output, stateEncodeDistribution);
+    output << ",\"stateDecodeMs\":";
+    WriteDistribution(output, stateDecodeDistribution);
+    output << ",\"replayMs\":";
+    WriteDistribution(output, replayDistribution);
+    output << "}\n";
+  }
 
   return 0;
 }

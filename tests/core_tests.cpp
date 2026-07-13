@@ -59,6 +59,8 @@ int main() {
   {
     lab::net::InputPacket p{};
     p.playerId = 2;
+    p.sessionId = 0x1122334455667788ULL;
+    p.matchId = 9;
     p.count = 99;
     p.seq = 12;
     p.newestTick = 8;
@@ -68,13 +70,41 @@ int main() {
     auto decoded = lab::net::DecodeInput(bytes.data(), bytes.size());
     Require(decoded.has_value(), "InputPacket decodes");
     Require(decoded->count == 2, "InputPacket count follows encoded command vector");
+    Require(decoded->sessionId == p.sessionId && decoded->matchId == p.matchId,
+            "InputPacket preserves response identity");
     Require(decoded->cmds.size() == 2, "InputPacket preserves commands");
     Require(decoded->cmds[1].moveY == 1, "InputPacket preserves moveY");
   }
 
   {
+    lab::net::AckPacket p{};
+    p.playerId = 2;
+    p.sessionId = 55;
+    p.matchId = 9;
+    p.serverTickProcessed = 123;
+    p.serverLastInputTick = 120;
+    p.serverStateHash = 0x123456789abcdef0ULL;
+    p.serverRecvInputSeq = 44;
+    p.serverInputPacketsReceived = 40;
+    p.serverInputPacketsLost = 3;
+
+    auto bytes = lab::net::EncodeAck(p);
+    auto decoded = lab::net::DecodeAck(bytes.data(), bytes.size());
+    Require(decoded.has_value(), "AckPacket decodes");
+    Require(decoded->sessionId == p.sessionId && decoded->matchId == p.matchId,
+            "AckPacket preserves response identity");
+    Require(decoded->serverRecvInputSeq == p.serverRecvInputSeq, "AckPacket preserves recv input seq");
+    Require(decoded->serverInputPacketsReceived == p.serverInputPacketsReceived,
+            "AckPacket preserves received input packet count");
+    Require(decoded->serverInputPacketsLost == p.serverInputPacketsLost,
+            "AckPacket preserves lost input packet count");
+  }
+
+  {
     lab::net::StatePacket p{};
     p.playerId = 1;
+    p.sessionId = 55;
+    p.matchId = 9;
     p.playerCount = 1;
     p.projectileCount = 1;
     p.tick = 33;
@@ -102,6 +132,43 @@ int main() {
     Require(decoded->players[0].aimX == -1, "StatePacket preserves aimX");
     Require(decoded->players[0].aimY == 1, "StatePacket preserves aimY");
     Require(decoded->stateHash == p.stateHash, "StatePacket preserves stateHash");
+    Require(decoded->sessionId == p.sessionId && decoded->matchId == p.matchId,
+            "StatePacket preserves response identity");
+  }
+
+  {
+    lab::net::StartPacket start{};
+    start.playerId = 2;
+    start.totalPlayers = 2;
+    start.sessionId = 77;
+    start.matchId = 3;
+    start.startTick = 30;
+    start.mazeSeed = 1234;
+    start.mazeWidth = 3;
+    start.mazeHeight = 3;
+    start.maze = {1, 1, 1, 1, 0, 1, 1, 1, 1};
+    auto bytes = lab::net::EncodeStart(start);
+    auto decoded = lab::net::DecodeStart(bytes.data(), bytes.size());
+    Require(decoded.has_value(), "StartPacket decodes");
+    Require(decoded->maze == start.maze, "StartPacket preserves authoritative maze");
+    Require(decoded->sessionId == start.sessionId && decoded->matchId == start.matchId,
+            "StartPacket preserves response identity");
+
+    bytes.push_back(0);
+    Require(!lab::net::DecodeStart(bytes.data(), bytes.size()),
+            "packet decoder rejects trailing data");
+  }
+
+  {
+    lab::net::ResetPacket reset{};
+    reset.playerId = 1;
+    reset.sessionId = 88;
+    reset.matchId = 4;
+    const auto bytes = lab::net::EncodeReset(reset);
+    const auto decoded = lab::net::DecodeReset(bytes.data(), bytes.size());
+    Require(decoded.has_value(), "ResetPacket decodes");
+    Require(decoded->sessionId == reset.sessionId && decoded->matchId == reset.matchId,
+            "ResetPacket preserves response identity");
   }
 
   {

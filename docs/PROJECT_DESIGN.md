@@ -7,17 +7,14 @@
 已验证：
 
 - `cmake --build build` 构建通过。
-- `ctest --test-dir build --output-on-failure` 通过，包含 `lab_tests` 和 `lab_stress_smoke`。
-- 当前代码没有接入 Redis，也没有实现典型 Singleton 对象。项目采用显式上下文和显式所有权，例如 `ServerCtx`、`ClientCtx`、`World`、`UdpSocket`。
+- `ctest --test-dir build --output-on-failure` 通过，包含 `lab_tests`、`lab_stress_smoke` 和 `lab_network_integration`。
+- 当前代码没有接入 Redis，也没有实现典型 Singleton 对象。项目采用显式上下文和显式所有权，例如 `AuthoritativeServer`、`ClientCtx`、`World`、`UdpSocket`。
 
-主要风险和改进建议：
+本轮已经完成输入窗口和值域校验、严格包长度检查、可靠 Start/Reset、断线比赛重置、权威迷宫网格同步，以及生产服务端逻辑与集成测试复用。仍需关注：
 
-1. 迷宫只同步 `mazeSeed`，没有同步完整迷宫网格。`World::GenerateMaze` 使用 `std::shuffle` 和 `std::mt19937` 生成迷宫，而 `Hasher` 又会把迷宫格子纳入哈希。当前同机测试没有问题，但跨编译器、跨标准库或后续换平台时，随机分布和洗牌实现差异可能导致同 seed 生成不同迷宫，从而出现哈希不一致。生产级做法是同步完整迷宫数据，或实现项目自有的确定性随机/洗牌算法。
-2. `kStartDelayTicks` 当前更像 tick 编号偏移，不是真正的开局倒计时。服务端在 `MaybeStartMatch` 中把 `tick` 直接跳到 `startTick` 并把 `started` 设为 true。如果设计目标是给客户端预热 30 帧，应增加等待态，让服务端在墙钟时间经过对应帧数后再正式推进。
-3. 服务端对客户端输入包的校验偏弱。`OnUdp` 会把包里的 `cmd.tick` 直接写入环形缓冲，恶意或异常客户端可以发送过大 tick，覆盖当前环槽。建议限制输入 tick 范围，例如只接受 `[serverTick - historyWindow, serverTick + maxLead]`，同时校验 `moveX/moveY` 只能为 `-1/0/1`、`buttons` 只包含允许位。
-4. 网络解码函数读完有效字段后没有强制检查 `p == end`，带尾部垃圾的数据包也会被接受。当前 Demo 可运行，但协议更严格时应拒绝尾部多余字节，便于发现粘包、版本不匹配或攻击流量。
-5. 玩家推箱碰撞在墙体碰撞之后执行，`ResolvePushbox` 可能把玩家推入墙体。建议推开玩家后再做一次墙体约束，或者把玩家间碰撞也纳入统一碰撞求解。
-6. `Action::Attack`、`atkActive`、`attackConnected` 等字段在协议和快照中保留了，但当前攻击逻辑实际是发射子弹，未进入 `Action::Attack` 状态。如果这是预留字段，应在说明中标注；如果希望表现攻击前摇/后摇，需要补齐状态机。
+1. `kStartDelayTicks` 当前是统一的起始 tick 编号，不是墙钟倒计时；如果界面需要真实倒计时，应增加显式 `Starting` 阶段。
+2. 玩家推箱碰撞在墙体碰撞之后执行，`ResolvePushbox` 仍可能把玩家推入墙体。
+3. `Action::Attack` 等字段仍属于预留状态；当前攻击行为实际是发射子弹。
 
 ## 项目定位
 
@@ -43,11 +40,14 @@
 
 - 网络层：`include/lab/net`、`src/net`
   - `UdpSocket`：非阻塞 UDP 封装，并接入 libevent。
-  - `Packets.h`：协议包结构，当前版本是 v3。
+  - `Packets.h`：协议包结构，当前版本是 v5。
   - `NetCodec`：手写二进制编解码，统一使用网络字节序。
 
+- 服务端层：`include/lab/server`、`src/server`
+  - `AuthoritativeServer`：生产与测试共用的会话、输入校验、比赛生命周期和权威推进逻辑。
+
 - 应用层：`apps`、`include/lab/app`、`src/app`
-  - `server_main.cpp`：服务端权威帧循环、握手、缺输入处理、状态广播。
+  - `server_main.cpp`：libevent 定时和 UDP 收发适配。
   - `client_main.cpp`：输入采样、本地预测、收包、回滚、SDL 渲染。
   - `GameConfig`：玩家数、帧长、输入冗余等配置。
   - `InputPrediction`：根据权威状态粗略推断远端玩家输入。
@@ -55,7 +55,7 @@
 
 ## 核心数据流
 
-客户端启动后，在没有收到 `Start` 前周期发送空 `Input` 包作为 hello。服务端按 UDP 地址分配玩家槽位，收齐 `kRequiredPlayers` 后广播 `Start`，告诉每个客户端自己的 `playerId` 和统一的 `startTick`。
+客户端启动后，在没有收到 `Start` 前周期发送空 `Input` 包作为 hello。服务端分配随机 `sessionId` 和玩家槽位，收齐玩家后发送带 `matchId`、`playerId`、起始 tick 和完整权威迷宫的 `Start`。Start 丢失时，后续 hello 会触发重发。
 
 开局后，每个客户端每 tick 做四件事：
 
@@ -161,7 +161,7 @@
 
 本项目选择显式上下文：
 
-- 服务端所有运行态放在 `ServerCtx`。
+- 服务端运行态由 `AuthoritativeServer` 显式持有。
 - 客户端所有运行态放在 `ClientCtx`。
 - `World` 是普通对象，可以构造、恢复、替换。
 - `UdpSocket` 使用 RAII 管理 fd 和事件注册。
@@ -197,15 +197,15 @@ Redis 不能自动保证所有读取都是强一致。不同场景要选择不�
 协议头包含：
 
 - `magic`：识别本项目协议。
-- `version`：当前为 v3，便于后续升级。
-- `type`：区分 `Input`、`Ack`、`State`、`Start`。
+- `version`：当前为 v5。
+- `type`：区分 `Input`、`Ack`、`State`、`Start`、`Reset`。
 
 主要报文：
 
-- `Input`：客户端到服务端。包含玩家 id、自增序号、最新输入 tick、客户端已确认的服务端 tick，以及最近 K 帧输入。
-- `Start`：服务端到客户端。分配 `playerId`，下发 `totalPlayers` 和 `startTick`。
-- `Ack`：服务端到客户端。反馈服务端已处理 tick、该玩家服务端已收到的最大输入 tick、服务端状态哈希。
-- `State`：服务端到客户端。包含权威 tick、迷宫 seed、玩家数组、子弹数组和状态哈希。
+- `Input`：客户端到服务端。包含统一身份、自增序号、tick 信息和最近 K 帧输入。
+- `Start`：服务端到客户端。包含统一身份、玩家数、起始 tick 和完整权威迷宫。
+- `Reset`：服务端到客户端。通知当前比赛失效并返回等待态。
+- `Ack`、`State`：均携带 `playerId + sessionId + matchId`；客户端统一校验后才处理。
 
 所有整数使用网络字节序。位置和速度以毫米整数传输，避免直接传 float 带来的平台差异和序列化不稳定。
 
@@ -233,15 +233,7 @@ Redis 不能自动保证所有读取都是强一致。不同场景要选择不�
 
 ## 后续演进建议
 
-短期可以优先做这些改进：
-
-1. 给解码函数增加尾部字节校验，并补对应单元测试。
-2. 服务端限制输入 tick 和输入值范围，避免异常包覆盖环形缓冲。
-3. 明确 `kStartDelayTicks` 语义。如果要真实倒计时，就实现等待态。
-4. 迷宫同步改成完整网格，或替换为自研确定性 RNG 和 shuffle。
-5. 推箱碰撞后增加墙体约束，避免玩家被挤进墙。
-6. 将 `ServerCtx` 中重复的配置改为引用 `GameConfig`，减少服务端和客户端配置漂移。
-7. 如果继续完善攻击系统，补齐 `Action::Attack` 的前摇、活动帧、后摇和网络同步语义；如果不需要，就清理保留字段或标注为预留。
+短期后续可以明确 `kStartDelayTicks` 的倒计时语义、修正推箱后的墙体约束，并决定是否保留完整攻击状态机字段。
 
 中长期可以考虑：
 

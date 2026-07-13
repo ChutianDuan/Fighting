@@ -65,6 +65,8 @@ struct ClientCtx {
     uint64_t lastServerHash = 0;
     Tick startTick = 0;
     bool hasStart = false;
+    uint64_t sessionId = 0;
+    uint32_t matchId = 0;
     double nextHelloSec = 0.0;
 
     uint32_t rollbackCount = 0;
@@ -73,10 +75,22 @@ struct ClientCtx {
     Tick lastHashMismatchTick = 0;
     Tick lastAuthoritativeTick = 0; // stateHist 中最新的权威写入 tick
 
+    lab::app::NetworkStats netStats{};
+
     // server 分配的玩家槽位：1..kMaxPlayers（0 表示未知）
     uint8_t localPlayerId = 0;
 
     uint32_t inputSeq = 0;
+
+    struct SentInputSlot {
+        bool valid = false;
+        Tick tick = 0;
+        double sentSec = 0.0;
+    };
+    std::vector<SentInputSlot> sentInputs{4096};
+    bool hasRttSample = false;
+    bool hasRttAckedInputTick = false;
+    Tick lastRttAckedInputTick = 0;
 
     static constexpr int kRedundancy = lab::app::GameConfig::kInputRedundancy;
 
@@ -86,6 +100,43 @@ struct ClientCtx {
         bool attack = false;
     } input;
 };
+
+static void RememberSentInput(ClientCtx& ctx, Tick tick, double sentSec) {
+    if (ctx.sentInputs.empty()) return;
+    auto& slot = ctx.sentInputs[size_t(tick % ctx.sentInputs.size())];
+    slot.valid = true;
+    slot.tick = tick;
+    slot.sentSec = sentSec;
+}
+
+static void ApplyAckNetworkStats(ClientCtx& ctx, const lab::net::AckPacket& ack, double now) {
+    ctx.netStats.inputLeadTicks = int32_t(ctx.tick) - int32_t(ack.serverTickProcessed);
+    ctx.netStats.inputPacketsReceived = ack.serverInputPacketsReceived;
+    ctx.netStats.inputPacketsLost = ack.serverInputPacketsLost;
+
+    const uint32_t totalInputPackets =
+        ack.serverInputPacketsReceived + ack.serverInputPacketsLost;
+    ctx.netStats.packetLossPct = totalInputPackets > 0
+        ? (double(ack.serverInputPacketsLost) * 100.0) / double(totalInputPackets)
+        : 0.0;
+
+    const Tick ackTick = ack.serverLastInputTick;
+    if (ctx.sentInputs.empty()) return;
+    if (ctx.hasRttAckedInputTick && ackTick == ctx.lastRttAckedInputTick) return;
+
+    const auto& slot = ctx.sentInputs[size_t(ackTick % ctx.sentInputs.size())];
+    if (!slot.valid || slot.tick != ackTick) return;
+
+    const double sampleMs = (now - slot.sentSec) * 1000.0;
+    if (sampleMs < 0.0 || sampleMs > 10000.0) return;
+
+    ctx.netStats.rttMs = ctx.hasRttSample
+        ? ctx.netStats.rttMs * 0.85 + sampleMs * 0.15
+        : sampleMs;
+    ctx.hasRttSample = true;
+    ctx.hasRttAckedInputTick = true;
+    ctx.lastRttAckedInputTick = ackTick;
+}
 
 static std::vector<InputCmd> BuildCmdVec(uint8_t localPid,
                                          const InputCmd& localCmd,
@@ -162,10 +213,7 @@ static void ApplyAuthoritativeState(
 
     // 构造权威快照（带上 maze / projectile 状态）
     WorldSnapshot auth = ctx.worldPred.Snapshot();
-    if (auth.mazeSeed != st.mazeSeed || auth.maze.empty()) {
-        ctx.worldPred.SetMazeSeed(st.mazeSeed);
-        auth = ctx.worldPred.Snapshot();
-    }
+    if (auth.mazeSeed != st.mazeSeed || auth.maze.empty()) return;
     auth.tick = st.tick;
     auth.mazeSeed = st.mazeSeed;
     auth.players.resize(ClientCtx::kMaxPlayers);
@@ -202,13 +250,16 @@ static void ApplyAuthoritativeState(
     }
 
     const uint64_t authHash = Hasher::Hash(auth);
-    if (authHash != st.stateHash && ctx.lastHashMismatchTick != st.tick) {
-        ctx.hashMismatchCount++;
-        ctx.lastHashMismatchTick = st.tick;
-        LOGW("State hash mismatch at tick=%u local=%llu server=%llu",
-             st.tick,
-             (unsigned long long)authHash,
-             (unsigned long long)st.stateHash);
+    if (authHash != st.stateHash) {
+        if (ctx.lastHashMismatchTick != st.tick) {
+            ctx.hashMismatchCount++;
+            ctx.lastHashMismatchTick = st.tick;
+            LOGW("Reject State hash mismatch at tick=%u local=%llu server=%llu",
+                 st.tick,
+                 (unsigned long long)authHash,
+                 (unsigned long long)st.stateHash);
+        }
+        return;
     }
 
     // 判断是否需要回滚：只比较“我自己的玩家”即可（否则因为对手预测不准会一直回滚）
@@ -238,27 +289,70 @@ static void ApplyAuthoritativeState(
         ctx.rollbackCount++;
         ctx.lastRollbackTick = st.tick;
     }
+    const Tick replayTicks = (ctx.tick > auth.tick + 1) ? (ctx.tick - auth.tick - 1) : 0;
+    const double replayStart = Clock::NowSeconds();
     RestoreAndReplay(ctx, auth);
+    const double replayCostMs = (Clock::NowSeconds() - replayStart) * 1000.0;
+    ctx.netStats.replayTicks = replayTicks;
+    ctx.netStats.replayCostMs = replayCostMs;
 }
 
 static void ApplyStart(ClientCtx& ctx, const lab::net::StartPacket& sp) {
-    if (ctx.localPlayerId == 0) ctx.localPlayerId = sp.playerId;
+    if (ctx.hasStart && ctx.sessionId == sp.sessionId && ctx.matchId == sp.matchId) return;
+
+    ctx.localPlayerId = sp.playerId;
+    ctx.sessionId = sp.sessionId;
+    ctx.matchId = sp.matchId;
     ctx.startTick = sp.startTick;
     ctx.hasStart = true;
     ctx.tick = sp.startTick;
     ctx.acc = 0.0;
     ctx.nextHelloSec = 0.0;
 
-    WorldSnapshot init = ctx.worldPred.Snapshot();
+    WorldSnapshot init{};
     init.tick = sp.startTick;
-    if (init.players.size() < ClientCtx::kMaxPlayers) {
-        init.players.resize(ClientCtx::kMaxPlayers);
-    }
+    init.players = lab::sim::World(ClientCtx::kMaxPlayers).Snapshot().players;
+    init.mazeSeed = sp.mazeSeed;
+    init.mazeWidth = sp.mazeWidth;
+    init.mazeHeight = sp.mazeHeight;
+    init.maze = sp.maze;
     ctx.worldPred.Restore(init);
+    ctx.localHist = InputBuffer(4096);
+    ctx.stateHist = lab::sim::StateHistory(4096);
+    std::fill(ctx.remoteHasLast.begin(), ctx.remoteHasLast.end(), 0);
+    std::fill(ctx.remoteLast.begin(), ctx.remoteLast.end(), InputCmd{});
+    for (auto& history : ctx.remoteHist) history = InputBuffer(4096);
     ctx.stateHist.Put(init);
 
     LOGI("Start received: playerId=%u total=%u startTick=%u",
          sp.playerId, sp.totalPlayers, sp.startTick);
+}
+
+static bool IsCurrentResponse(const ClientCtx& ctx,
+                              uint8_t playerId,
+                              uint64_t sessionId,
+                              uint32_t matchId) {
+    return ctx.hasStart && playerId == ctx.localPlayerId &&
+           sessionId == ctx.sessionId && matchId == ctx.matchId;
+}
+
+static void ApplyReset(ClientCtx& ctx, const lab::net::ResetPacket& reset) {
+    if (!IsCurrentResponse(ctx, reset.playerId, reset.sessionId, reset.matchId)) return;
+    ctx.hasStart = false;
+    ctx.tick = 0;
+    ctx.startTick = 0;
+    ctx.lastServerTick = 0;
+    ctx.lastServerHash = 0;
+    ctx.lastAuthoritativeTick = 0;
+    ctx.acc = 0.0;
+    ctx.nextHelloSec = 0.0;
+    ctx.worldPred = lab::sim::World(ClientCtx::kMaxPlayers);
+    ctx.localHist = InputBuffer(4096);
+    ctx.stateHist = lab::sim::StateHistory(4096);
+    std::fill(ctx.remoteHasLast.begin(), ctx.remoteHasLast.end(), 0);
+    std::fill(ctx.remoteLast.begin(), ctx.remoteLast.end(), InputCmd{});
+    for (auto& history : ctx.remoteHist) history = InputBuffer(4096);
+    LOGI("Match reset received; waiting for players");
 }
 
 static void PrintHud(const ClientCtx& ctx) {
@@ -289,19 +383,26 @@ static void OnUdp(void* user,
     if (from.Key() != ctx->server.Key()) return;
 
     if (auto sp = lab::net::DecodeStart(data, len)) {
+        if (sp->playerId == 0 || sp->playerId > ClientCtx::kMaxPlayers ||
+            sp->sessionId == 0 || sp->matchId == 0 || sp->maze.empty()) return;
+        if (ctx->sessionId != 0 && sp->sessionId != ctx->sessionId) return;
+        if (sp->matchId < ctx->matchId ||
+            (!ctx->hasStart && sp->matchId == ctx->matchId)) return;
         ApplyStart(*ctx, *sp);
+        return;
+    }
+
+    if (auto reset = lab::net::DecodeReset(data, len)) {
+        ApplyReset(*ctx, *reset);
         return;
     }
 
     // 1) ACK
     if (auto ack = lab::net::DecodeAck(data, len)) {
+        if (!IsCurrentResponse(*ctx, ack->playerId, ack->sessionId, ack->matchId)) return;
         ctx->lastServerTick = ack->serverTickProcessed;
         ctx->lastServerHash = ack->serverStateHash;
-
-        if (ctx->localPlayerId == 0) {
-            ctx->localPlayerId = ack->playerId; // server 分配的槽位
-            LOGI("Assigned localPlayerId=%u (from ACK)", ctx->localPlayerId);
-        }
+        ApplyAckNetworkStats(*ctx, *ack, Clock::NowSeconds());
 
         if (ctx->lastServerTick % 60 == 0) {
             LOGI("ACK: serverTick=%u lastInput=%u hash=%llu",
@@ -328,13 +429,11 @@ static void OnUdp(void* user,
 
     // 2) STATE
     if (auto st = lab::net::DecodeState(data, len)) {
-        if (ctx->localPlayerId == 0) {
-            ctx->localPlayerId = st->playerId;
-            LOGI("Assigned localPlayerId=%u (from STATE)", ctx->localPlayerId);
-        }
+        if (!IsCurrentResponse(*ctx, st->playerId, st->sessionId, st->matchId)) return;
         if (ctx->lastAuthoritativeTick != 0 && st->tick <= ctx->lastAuthoritativeTick) {
             return;
         }
+        ctx->netStats.stateDelayTicks = int32_t(ctx->tick) - int32_t(st->tick);
 
         // 更新远端输入预测（逐 slot）
         uint8_t localPid = ctx->localPlayerId ? ctx->localPlayerId : 1;
@@ -378,6 +477,8 @@ static void OnUdp(void* user,
 static void SendHello(ClientCtx& ctx) {
     lab::net::InputPacket p;
     p.playerId = (ctx.localPlayerId != 0) ? ctx.localPlayerId : 1;
+    p.sessionId = ctx.sessionId;
+    p.matchId = 0;
     p.newestTick = ctx.tick;
     p.clientAckServerTick = ctx.lastServerTick;
     p.count = 0;
@@ -431,7 +532,8 @@ static void OnTick(evutil_socket_t, short, void* user) {
         lab::app::RenderFrame(ctx->render,
                               ctx->worldPred.Snapshot(),
                               ctx->rollbackCount,
-                              ctx->hashMismatchCount);
+                              ctx->hashMismatchCount,
+                              &ctx->netStats);
         return;
     }
 
@@ -460,6 +562,8 @@ static void OnTick(evutil_socket_t, short, void* user) {
         // 4) 打包冗余输入（只发送“我自己的输入历史”）
         lab::net::InputPacket p;
         p.playerId = (ctx->localPlayerId != 0) ? ctx->localPlayerId : 1; // server 实际按 addr 分配，这里只是自描述
+        p.sessionId = ctx->sessionId;
+        p.matchId = ctx->matchId;
         p.seq = ctx->inputSeq++;
         p.newestTick = ctx->tick;
         p.clientAckServerTick = ctx->lastServerTick;
@@ -474,6 +578,7 @@ static void OnTick(evutil_socket_t, short, void* user) {
         p.count = (uint8_t)p.cmds.size();
 
         auto bytes = lab::net::EncodeInput(p);
+        RememberSentInput(*ctx, ctx->tick, Clock::NowSeconds());
         ctx->sock.SendTo(ctx->server, bytes);
 
         ctx->tick++;
@@ -481,9 +586,14 @@ static void OnTick(evutil_socket_t, short, void* user) {
 
         if (ctx->tick % 60 == 0) {
             const int32_t lead = int32_t(ctx->tick) - int32_t(ctx->lastServerTick);
-            LOGI("STAT tick=%u lead=%d rollbacks=%u last_rb=%u hash_mismatch=%u last_hash=%u",
+            LOGI("STAT tick=%u lead=%d rtt=%.1fms loss=%.1f%% state_delay=%d replay=%u/%.2fms rollbacks=%u last_rb=%u hash_mismatch=%u last_hash=%u",
                  ctx->tick,
                  lead,
+                 ctx->netStats.rttMs,
+                 ctx->netStats.packetLossPct,
+                 ctx->netStats.stateDelayTicks,
+                 ctx->netStats.replayTicks,
+                 ctx->netStats.replayCostMs,
                  ctx->rollbackCount,
                  ctx->lastRollbackTick,
                  ctx->hashMismatchCount,
@@ -495,7 +605,8 @@ static void OnTick(evutil_socket_t, short, void* user) {
     lab::app::RenderFrame(ctx->render,
                           ctx->worldPred.Snapshot(),
                           ctx->rollbackCount,
-                          ctx->hashMismatchCount);
+                          ctx->hashMismatchCount,
+                          &ctx->netStats);
 }
 
 int main(int argc, char** argv) {

@@ -44,6 +44,7 @@ public:
   bool RecvFrom(UdpAddr& from, std::vector<uint8_t>& out);
 
   int fd() const { return fd_; }
+  uint16_t LocalPort() const;
 
   // ---------------- libevent 集成 ----------------
   // 将该 UDP socket 注册到 event_base；收到任何 datagram 时触发回调
