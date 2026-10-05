@@ -14,9 +14,11 @@ namespace {
 constexpr uint16_t kAllowedButtons = BIN_LEFT | BIN_RIGHT | BIN_JUMP | BIN_ATK;
 
 bool IsLater(Tick value, Tick previous) {
+  // 模运算差值支持帧号回绕；前提是两帧距离小于 2^31。
   return static_cast<int32_t>(value - previous) > 0;
 }
 
+// 快照转网络状态，位置/速度的 lround(*1000) 必须与 Hasher 量化口径一致。
 lab::net::StatePacket MakeState(const WorldSnapshot& snap,
                                 uint8_t playerId,
                                 uint64_t sessionId,
@@ -145,6 +147,7 @@ bool AuthoritativeServer::ValidateGameplayInput(
 void AuthoritativeServer::ObserveInputStats(
     ClientConn& client,
     const lab::net::InputPacket& input) {
+  // 累加通过校验的包数；seq gap 不因迟到包补回而减少，因此只用于估计。
   ++client.inputPacketsReceived;
   if (client.hasInputSeq) {
     const int32_t advance = static_cast<int32_t>(input.seq - client.lastInputSeq);
@@ -156,6 +159,7 @@ void AuthoritativeServer::ObserveInputStats(
 }
 
 InputCmd AuthoritativeServer::GetCmdForTick(ClientConn& client, Tick tick) {
+  // 只有取到真实输入才更新 lastAppliedTick；保持旧输入不会延长六帧窗口。
   if (auto input = client.inputBuf.Get(tick)) {
     client.hasLastApplied = true;
     client.lastApplied = *input;
@@ -177,10 +181,11 @@ lab::net::StartPacket AuthoritativeServer::MakeStart(const ClientConn& client) c
   start.totalPlayers = kMaxPlayers;
   start.sessionId = client.sessionId;
   start.matchId = matchId_;
-  start.startTick = tick_;
+  start.startTick = tick_; // 重发 Start 时取当前下一帧，客户端已有同局 Start 时忽略
   start.mazeSeed = snap.mazeSeed;
   start.mazeWidth = static_cast<uint16_t>(snap.mazeWidth);
   start.mazeHeight = static_cast<uint16_t>(snap.mazeHeight);
+  // 传完整地图，避免各平台标准库 shuffle 差异导致相同 seed 生成不同网格。
   start.maze = snap.maze;
   return start;
 }
@@ -199,7 +204,7 @@ std::vector<OutboundDatagram> AuthoritativeServer::MaybeStartMatch() {
   if (started_ || online_count() < kRequiredPlayers) return {};
   ++matchId_;
   if (matchId_ == 0) ++matchId_;
-  tick_ = kStartDelayTicks;
+  tick_ = kStartDelayTicks; // 设置编号后即可推进，不额外等待 30 帧墙钟时间
   started_ = true;
   if (enableLogs_) {
     LOGI("Start match=%u tick=%u players=%zu", matchId_, tick_, online_count());
@@ -251,12 +256,14 @@ std::vector<OutboundDatagram> AuthoritativeServer::HandleDatagram(
   client->lastHeardSec = nowSec;
 
   if (input->cmds.empty()) {
+    // hello 同时承担首次入局和丢失 Start 后的重试，不建立通用可靠 UDP 通道。
     if (started_) {
       return {{client->addr, lab::net::EncodeStart(MakeStart(*client))}};
     }
     return MaybeStartMatch();
   }
   if (!started_) {
+    // 玩家超时结束比赛后，旧局输入会再次触发 Reset，补偿首次 Reset 丢失。
     lab::net::ResetPacket reset{};
     reset.playerId = client->playerId;
     reset.sessionId = client->sessionId;
@@ -284,6 +291,7 @@ std::vector<OutboundDatagram> AuthoritativeServer::AdvanceOneTick() {
     commands.push_back(client ? GetCmdForTick(*client, tick_)
                               : InputBuffer::DefaultForTick(tick_));
   }
+  // Step 的快照标记为本次 commands 的 tick，ACK 也确认同一个已完成帧。
   world_.Step(commands, 1.0f / 60.0f);
   const WorldSnapshot snap = world_.Snapshot();
   const uint64_t hash = Hasher::Hash(snap);
@@ -316,6 +324,7 @@ std::vector<OutboundDatagram> AuthoritativeServer::AdvanceOneTick() {
 }
 
 std::vector<OutboundDatagram> AuthoritativeServer::ResetMatch() {
+  // 剩余在线玩家保留 sessionId/槽位；清空本局历史，下一次开局递增 matchId。
   std::vector<OutboundDatagram> output;
   if (started_) {
     for (uint8_t playerId = 1; playerId <= kMaxPlayers; ++playerId) {

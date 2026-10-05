@@ -34,9 +34,9 @@ bool CmdsAligned(const std::vector<InputCmd>& cmds) {
 int FacingFromDir(float dx, float dy) {
     const float ax = std::fabs(dx);
     const float ay = std::fabs(dy);
-    if (ax < 1e-4f && ay < 1e-4f) return 1; // default right
-    if (ax >= ay) return dx >= 0.0f ? 1 : 0; // 0 left, 1 right
-    return dy >= 0.0f ? 2 : 3;               // 2 up, 3 down
+    if (ax < 1e-4f && ay < 1e-4f) return 1; // 默认朝右
+    if (ax >= ay) return dx >= 0.0f ? 1 : 0; // 0 左、1 右
+    return dy >= 0.0f ? 2 : 3;               // 2 上、3 下
 }
 
 std::pair<float, float> DirFromFacing(uint8_t facing) {
@@ -229,10 +229,8 @@ void World::SyncProjectiles(WorldSnapshot& out) const {
 }
 
 WorldSnapshot World::Snapshot() const {
-    WorldSnapshot out = snap_;
-    SnapshotMaze(out);
-    SyncProjectiles(out);
-    return out;
+    // Step/Restore 已同步动态状态；完整值导出仍拥有独立容器。
+    return snap_;
 }
 
 void World::Restore(const WorldSnapshot& s) {
@@ -241,12 +239,14 @@ void World::Restore(const WorldSnapshot& s) {
     mazeW_ = s.mazeWidth ? s.mazeWidth : mazeW_;
     mazeH_ = s.mazeHeight ? s.mazeHeight : mazeH_;
     if (!s.maze.empty()) {
+        // 网络对局使用 Start 提供的完整地图；无网格时才从 seed 本地生成。
         maze_ = s.maze;
     } else {
         rng_.seed(mazeSeed_);
         GenerateMaze();
     }
 
+    // 最近方向是射击依赖的内部缓存，必须从快照重建，避免恢复后朝向分叉。
     lastDirX_.assign(snap_.players.size(), 1.0f);
     lastDirY_.assign(snap_.players.size(), 0.0f);
     for (size_t i = 0; i < snap_.players.size(); ++i) {
@@ -357,7 +357,7 @@ void World::Step(const std::vector<InputCmd>& cmds, float dt) {
     }
 
     EnsureMaze();
-    snap_.tick = cmds[0].tick;
+    snap_.tick = cmds[0].tick; // 快照帧号表示本次输入应用后的状态，不预先加一
 
     for (size_t i = 0; i < snap_.players.size(); ++i) {
         auto& p = snap_.players[i];
@@ -382,6 +382,7 @@ void World::Step(const std::vector<InputCmd>& cmds, float dt) {
         float nx = p.x + p.v * dt;
         float ny = p.y + p.vy * dt;
 
+        // 分轴处理墙体碰撞，再在循环末尾处理玩家之间的推箱。
         if (!BoxHitsWall(nx, p.y, kPlayerRadius)) p.x = nx;
         else p.v = 0.0f;
         if (!BoxHitsWall(p.x, ny, kPlayerRadius)) p.y = ny;
@@ -411,15 +412,24 @@ void World::Step(const std::vector<InputCmd>& cmds, float dt) {
         }
     }
 
-    for (size_t i = 0; i < snap_.players.size(); ++i) {
-        for (size_t j = i + 1; j < snap_.players.size(); ++j) {
-            ResolvePushbox(snap_.players[i], snap_.players[j], kPlayerRadius);
+    // 与移动复用分轴墙体约束。固定四轮保持重放成本有界；狭窄处允许残留重叠。
+    for (int pass = 0; pass < 4; ++pass) {
+        for (size_t i = 0; i < snap_.players.size(); ++i) {
+            for (size_t j = i + 1; j < snap_.players.size(); ++j) {
+                auto a = snap_.players[i], b = snap_.players[j];
+                ResolvePushbox(a, b, kPlayerRadius);
+                auto constrain = [&](PlayerState& player, const PlayerState& candidate) {
+                    if (!BoxHitsWall(candidate.x, player.y, kPlayerRadius)) player.x = candidate.x;
+                    if (!BoxHitsWall(player.x, candidate.y, kPlayerRadius)) player.y = candidate.y;
+                };
+                constrain(snap_.players[i], a);
+                constrain(snap_.players[j], b);
+            }
         }
     }
 
     StepProjectiles(dt);
     SyncProjectiles(snap_);
-    SnapshotMaze(snap_);
 }
 
 } // namespace lab::sim

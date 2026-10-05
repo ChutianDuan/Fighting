@@ -1,687 +1,187 @@
-// apps/client_main.cpp
-#include <lab/net/UdpSocket.h>
-#include <lab/net/NetCodec.h>
-
-#include <lab/app/GameConfig.h>
-#include <lab/app/InputPrediction.h>
+#include <arpa/inet.h>
+#include <iostream>
 #include <lab/app/ClientRender.h>
-
-#include <lab/sim/InputBuffer.h>
-#include <lab/sim/StateHistory.h>
-#include <lab/sim/World.h>
+#include <lab/net/UdpSocket.h>
+#include <lab/session/ClientSession.h>
+#include <lab/session/Replay.h>
 #include <lab/sim/Hasher.h>
-
 #include <lab/time/Clock.h>
-#include <lab/util/log.h>
+#include <memory>
 
-#include <vector>
-#include <string>
-#include <cmath>
-#include <cstdint>
-#include <algorithm>
-
-// libevent
-#include <event2/event.h>
-#include <event2/util.h>
-
-// SDL2
-#include <SDL.h>
-#include <SDL_ttf.h>
-
-static inline float FromMM(int32_t mm) { return float(mm) / 1000.0f; }
-
-struct ClientCtx {
-    static constexpr uint8_t kMaxPlayers = lab::app::GameConfig::kMaxPlayers; // 扩展多人时调大，并同步状态包结构
-
-    lab::app::RenderCtx render{};
-    bool running = true;
-    event_base* base = nullptr;
-
-    lab::net::UdpSocket sock;
-    lab::net::UdpAddr server{};
-
-    static constexpr double dt = lab::app::GameConfig::kDt;
-    static constexpr double maxFrame = lab::app::GameConfig::kMaxFrame;
-
-    double prev = 0.0;
-    double acc  = 0.0;
-
-    Tick tick = 0; // localNextTick
-
-    lab::sim::World worldPred{kMaxPlayers};
-
-    // 本地输入历史（只存“我自己的输入”，不区分 P1/P2）
-    InputBuffer localHist{4096};
-
-    // 远端玩家输入预测历史（按 slot 存，包含占位，slot 从 1 开始）
-    std::vector<InputBuffer> remoteHist;
-    std::vector<uint8_t> remoteHasLast; // bool proxy-free
-    std::vector<InputCmd> remoteLast;
-
-    // 历史状态环（预测+权威混存，用于回滚/对账）
-    lab::sim::StateHistory stateHist{4096};
-
-    Tick lastServerTick = 0;   // 服务器 ACK 的已处理 tick
-    uint64_t lastServerHash = 0;
-    Tick startTick = 0;
-    bool hasStart = false;
-    uint64_t sessionId = 0;
-    uint32_t matchId = 0;
-    double nextHelloSec = 0.0;
-
-    uint32_t rollbackCount = 0;
-    uint32_t hashMismatchCount = 0;
-    Tick lastRollbackTick = 0;
-    Tick lastHashMismatchTick = 0;
-    Tick lastAuthoritativeTick = 0; // stateHist 中最新的权威写入 tick
-
-    lab::app::NetworkStats netStats{};
-
-    // server 分配的玩家槽位：1..kMaxPlayers（0 表示未知）
-    uint8_t localPlayerId = 0;
-
-    uint32_t inputSeq = 0;
-
-    struct SentInputSlot {
-        bool valid = false;
-        Tick tick = 0;
-        double sentSec = 0.0;
-    };
-    std::vector<SentInputSlot> sentInputs{4096};
-    bool hasRttSample = false;
-    bool hasRttAckedInputTick = false;
-    Tick lastRttAckedInputTick = 0;
-
-    static constexpr int kRedundancy = lab::app::GameConfig::kInputRedundancy;
-
-    struct InputState {
-        int8_t moveX = 0;
-        int8_t moveY = 0;
-        bool attack = false;
-    } input;
+using namespace lab::session;
+namespace {
+struct SdlContext {
+    lab::app::RenderCtx render;
+    ~SdlContext() {
+        lab::app::ShutdownRenderer(render);
+        if (TTF_WasInit())
+            TTF_Quit();
+        SDL_Quit();
+    }
 };
-
-static void RememberSentInput(ClientCtx& ctx, Tick tick, double sentSec) {
-    if (ctx.sentInputs.empty()) return;
-    auto& slot = ctx.sentInputs[size_t(tick % ctx.sentInputs.size())];
-    slot.valid = true;
-    slot.tick = tick;
-    slot.sentSec = sentSec;
-}
-
-static void ApplyAckNetworkStats(ClientCtx& ctx, const lab::net::AckPacket& ack, double now) {
-    ctx.netStats.inputLeadTicks = int32_t(ctx.tick) - int32_t(ack.serverTickProcessed);
-    ctx.netStats.inputPacketsReceived = ack.serverInputPacketsReceived;
-    ctx.netStats.inputPacketsLost = ack.serverInputPacketsLost;
-
-    const uint32_t totalInputPackets =
-        ack.serverInputPacketsReceived + ack.serverInputPacketsLost;
-    ctx.netStats.packetLossPct = totalInputPackets > 0
-        ? (double(ack.serverInputPacketsLost) * 100.0) / double(totalInputPackets)
-        : 0.0;
-
-    const Tick ackTick = ack.serverLastInputTick;
-    if (ctx.sentInputs.empty()) return;
-    if (ctx.hasRttAckedInputTick && ackTick == ctx.lastRttAckedInputTick) return;
-
-    const auto& slot = ctx.sentInputs[size_t(ackTick % ctx.sentInputs.size())];
-    if (!slot.valid || slot.tick != ackTick) return;
-
-    const double sampleMs = (now - slot.sentSec) * 1000.0;
-    if (sampleMs < 0.0 || sampleMs > 10000.0) return;
-
-    ctx.netStats.rttMs = ctx.hasRttSample
-        ? ctx.netStats.rttMs * 0.85 + sampleMs * 0.15
-        : sampleMs;
-    ctx.hasRttSample = true;
-    ctx.hasRttAckedInputTick = true;
-    ctx.lastRttAckedInputTick = ackTick;
-}
-
-static std::vector<InputCmd> BuildCmdVec(uint8_t localPid,
-                                         const InputCmd& localCmd,
-                                         const std::vector<InputCmd>& remoteCmds) {
-    std::vector<InputCmd> cmds(ClientCtx::kMaxPlayers, InputBuffer::DefaultForTick(localCmd.tick));
-    const uint8_t lp = (localPid == 0) ? 1 : localPid;
-    if (lp >= 1 && lp <= ClientCtx::kMaxPlayers) {
-        cmds[lp - 1] = localCmd;
-    }
-    for (size_t i = 0; i < remoteCmds.size() && i < cmds.size(); ++i) {
-        // remoteCmds 里包含全部玩家槽位的预测（含占位）
-        if ((i + 1) == lp) continue;
-        cmds[i] = remoteCmds[i];
-    }
-    return cmds;
-}
-
-static InputCmd GetRemoteCmdForTick(ClientCtx& ctx, uint8_t pid, Tick t) {
-    if (pid == 0 || pid > ClientCtx::kMaxPlayers) return InputBuffer::DefaultForTick(t);
-    auto& buf = ctx.remoteHist[pid - 1];
-    auto hasLast = ctx.remoteHasLast[pid - 1] != 0;
-    auto& last = ctx.remoteLast[pid - 1];
-    constexpr Tick kHoldTicks = 6;
-
-    if (auto opt = buf.Get(t)) {
-        ctx.remoteHasLast[pid - 1] = 1;
-        last = *opt;
-        return *opt;
-    }
-    if (hasLast) {
-        if (t > last.tick && (t - last.tick) > kHoldTicks) {
-            return InputBuffer::DefaultForTick(t);
+} // namespace
+int main(int argc, char **argv) {
+    try {
+        std::string host = "127.0.0.1", font = "/System/Library/Fonts/Menlo.ttc", replayFile,
+                    recordFile;
+        uint16_t port = 40000;
+        uint32_t room = 1;
+        bool smooth = true;
+        int frameLimit = 0;
+        for (int i = 1; i < argc; ++i) {
+            std::string arg = argv[i];
+            auto value = [&]() {
+                if (++i >= argc)
+                    throw std::runtime_error("missing option value");
+                return std::string(argv[i]);
+            };
+            if (arg == "--server") {
+                host = value();
+                auto pos = host.find(':');
+                if (pos != std::string::npos) {
+                    auto n = std::stoul(host.substr(pos + 1));
+                    if (!n || n > 65535)
+                        throw std::runtime_error("invalid port");
+                    port = n;
+                    host.resize(pos);
+                }
+            } else if (arg == "--room") {
+                auto n = std::stoull(value());
+                if (!n || n > UINT32_MAX)
+                    throw std::runtime_error("invalid room");
+                room = n;
+            } else if (arg == "--font")
+                font = value();
+            else if (arg == "--replay")
+                replayFile = value();
+            else if (arg == "--record")
+                recordFile = value();
+            else if (arg == "--no-smoothing")
+                smooth = false;
+            else if (arg == "--frames")
+                frameLimit = std::stoi(value());
+            else
+                throw std::runtime_error("unknown option: " + arg);
         }
-        InputCmd c = last;
-        c.tick = t;
-        return c; // HoldLast
-    }
-    return InputBuffer::DefaultForTick(t);
-}
-
-static void RestoreAndReplay(ClientCtx& ctx, const WorldSnapshot& auth) {
-    ctx.worldPred.Restore(auth);
-
-    for (Tick t = auth.tick + 1; t < ctx.tick; ++t) {
-        InputCmd localCmd = ctx.localHist.Get(t).value_or(InputBuffer::DefaultForTick(t));
-
-        std::vector<InputCmd> remoteCmds(ClientCtx::kMaxPlayers, InputBuffer::DefaultForTick(t));
-        for (uint8_t pid = 1; pid <= ClientCtx::kMaxPlayers; ++pid) {
-            if (pid == ctx.localPlayerId) continue;
-            remoteCmds[pid - 1] = GetRemoteCmdForTick(ctx, pid, t);
-        }
-
-        auto cmds = BuildCmdVec(ctx.localPlayerId, localCmd, remoteCmds);
-        ctx.worldPred.Step(cmds, float(ClientCtx::dt));
-        ctx.stateHist.Put(ctx.worldPred.Snapshot());
-    }
-}
-
-static void ApplyAuthoritativeState(
-    ClientCtx& ctx,
-    const lab::net::StatePacket& st)
-{
-    if (ctx.lastAuthoritativeTick != 0 && st.tick <= ctx.lastAuthoritativeTick) {
-        return;
-    }
-
-    auto toAction = [](uint8_t a) {
-        switch (a) {
-            case 1: return Action::Attack;
-            case 2: return Action::Hitstun;
-            default: return Action::Idle;
-        }
-    };
-
-    // 构造权威快照（带上 maze / projectile 状态）
-    WorldSnapshot auth = ctx.worldPred.Snapshot();
-    if (auth.mazeSeed != st.mazeSeed || auth.maze.empty()) return;
-    auth.tick = st.tick;
-    auth.mazeSeed = st.mazeSeed;
-    auth.players.resize(ClientCtx::kMaxPlayers);
-    const size_t count = std::min<size_t>(st.players.size(), ClientCtx::kMaxPlayers);
-    for (size_t i = 0; i < count; ++i) {
-        const auto& ps = st.players[i];
-        auth.players[i].x = FromMM(ps.x_mm);
-        auth.players[i].v = FromMM(ps.v_mm);
-        auth.players[i].y = FromMM(ps.y_mm);
-        auth.players[i].vy = FromMM(ps.vy_mm);
-        auth.players[i].hp = ps.hp;
-        auth.players[i].action = toAction(ps.action);
-        auth.players[i].facing = ps.facing;
-        auth.players[i].stateTimer = ps.stateTimer;
-        auth.players[i].atkActive = ps.atkActive;
-        auth.players[i].attackConnected = ps.attackConnected;
-        auth.players[i].onGround = ps.onGround;
-        auth.players[i].shotCooldown = ps.shotCooldown;
-        auth.players[i].aimX = ps.aimX;
-        auth.players[i].aimY = ps.aimY;
-    }
-    auth.projectiles.clear();
-    auth.projectiles.reserve(st.projectiles.size());
-    for (const auto& pr : st.projectiles) {
-        ProjectileState prd{};
-        prd.x = FromMM(pr.x_mm);
-        prd.y = FromMM(pr.y_mm);
-        prd.vx = FromMM(pr.vx_mm);
-        prd.vy = FromMM(pr.vy_mm);
-        prd.life = pr.life;
-        prd.owner = pr.owner;
-        prd.alive = pr.life > 0 ? 1 : 0;
-        auth.projectiles.push_back(prd);
-    }
-
-    const uint64_t authHash = Hasher::Hash(auth);
-    if (authHash != st.stateHash) {
-        if (ctx.lastHashMismatchTick != st.tick) {
-            ctx.hashMismatchCount++;
-            ctx.lastHashMismatchTick = st.tick;
-            LOGW("Reject State hash mismatch at tick=%u local=%llu server=%llu",
-                 st.tick,
-                 (unsigned long long)authHash,
-                 (unsigned long long)st.stateHash);
-        }
-        return;
-    }
-
-    // 判断是否需要回滚：只比较“我自己的玩家”即可（否则因为对手预测不准会一直回滚）
-    uint8_t pid = ctx.localPlayerId ? ctx.localPlayerId : 1;
-    size_t idx = (pid == 2) ? 1 : 0;
-
-    bool needRollback = false;
-    if (auto localOpt = ctx.stateHist.Get(st.tick)) {
-        const auto& local = *localOpt;
-
-        if (local.players.size() > idx && auth.players.size() > idx) {
-            float dx = std::fabs(local.players[idx].x - auth.players[idx].x);
-            float dy = std::fabs(local.players[idx].y - auth.players[idx].y);
-            constexpr float kPosEps = 0.15f; // 放宽回滚阈值，减少本地抖动
-            constexpr float kPosYEps = 0.15f;
-            const bool hpDiff = local.players[idx].hp != auth.players[idx].hp;
-            const bool actionDiff = local.players[idx].action != auth.players[idx].action;
-            const bool groundDiff = local.players[idx].onGround != auth.players[idx].onGround;
-            needRollback = (dx > kPosEps) || (dy > kPosYEps) || hpDiff || actionDiff || groundDiff;
-        }
-    }
-
-    ctx.stateHist.Put(auth); // 覆盖存权威快照，供后续 hash 对账使用
-    ctx.lastAuthoritativeTick = st.tick;
-
-    if (needRollback) {
-        ctx.rollbackCount++;
-        ctx.lastRollbackTick = st.tick;
-    }
-    const Tick replayTicks = (ctx.tick > auth.tick + 1) ? (ctx.tick - auth.tick - 1) : 0;
-    const double replayStart = Clock::NowSeconds();
-    RestoreAndReplay(ctx, auth);
-    const double replayCostMs = (Clock::NowSeconds() - replayStart) * 1000.0;
-    ctx.netStats.replayTicks = replayTicks;
-    ctx.netStats.replayCostMs = replayCostMs;
-}
-
-static void ApplyStart(ClientCtx& ctx, const lab::net::StartPacket& sp) {
-    if (ctx.hasStart && ctx.sessionId == sp.sessionId && ctx.matchId == sp.matchId) return;
-
-    ctx.localPlayerId = sp.playerId;
-    ctx.sessionId = sp.sessionId;
-    ctx.matchId = sp.matchId;
-    ctx.startTick = sp.startTick;
-    ctx.hasStart = true;
-    ctx.tick = sp.startTick;
-    ctx.acc = 0.0;
-    ctx.nextHelloSec = 0.0;
-
-    WorldSnapshot init{};
-    init.tick = sp.startTick;
-    init.players = lab::sim::World(ClientCtx::kMaxPlayers).Snapshot().players;
-    init.mazeSeed = sp.mazeSeed;
-    init.mazeWidth = sp.mazeWidth;
-    init.mazeHeight = sp.mazeHeight;
-    init.maze = sp.maze;
-    ctx.worldPred.Restore(init);
-    ctx.localHist = InputBuffer(4096);
-    ctx.stateHist = lab::sim::StateHistory(4096);
-    std::fill(ctx.remoteHasLast.begin(), ctx.remoteHasLast.end(), 0);
-    std::fill(ctx.remoteLast.begin(), ctx.remoteLast.end(), InputCmd{});
-    for (auto& history : ctx.remoteHist) history = InputBuffer(4096);
-    ctx.stateHist.Put(init);
-
-    LOGI("Start received: playerId=%u total=%u startTick=%u",
-         sp.playerId, sp.totalPlayers, sp.startTick);
-}
-
-static bool IsCurrentResponse(const ClientCtx& ctx,
-                              uint8_t playerId,
-                              uint64_t sessionId,
-                              uint32_t matchId) {
-    return ctx.hasStart && playerId == ctx.localPlayerId &&
-           sessionId == ctx.sessionId && matchId == ctx.matchId;
-}
-
-static void ApplyReset(ClientCtx& ctx, const lab::net::ResetPacket& reset) {
-    if (!IsCurrentResponse(ctx, reset.playerId, reset.sessionId, reset.matchId)) return;
-    ctx.hasStart = false;
-    ctx.tick = 0;
-    ctx.startTick = 0;
-    ctx.lastServerTick = 0;
-    ctx.lastServerHash = 0;
-    ctx.lastAuthoritativeTick = 0;
-    ctx.acc = 0.0;
-    ctx.nextHelloSec = 0.0;
-    ctx.worldPred = lab::sim::World(ClientCtx::kMaxPlayers);
-    ctx.localHist = InputBuffer(4096);
-    ctx.stateHist = lab::sim::StateHistory(4096);
-    std::fill(ctx.remoteHasLast.begin(), ctx.remoteHasLast.end(), 0);
-    std::fill(ctx.remoteLast.begin(), ctx.remoteLast.end(), InputCmd{});
-    for (auto& history : ctx.remoteHist) history = InputBuffer(4096);
-    LOGI("Match reset received; waiting for players");
-}
-
-static void PrintHud(const ClientCtx& ctx) {
-    WorldSnapshot snap = ctx.worldPred.Snapshot();
-    LOGI("HUD tick=%u rollbacks=%u hashMismatch=%u",
-         snap.tick, ctx.rollbackCount, ctx.hashMismatchCount);
-    for (size_t i = 0; i < snap.players.size(); ++i) {
-        const auto& p = snap.players[i];
-        LOGI("  P%zu x=%.2f y=%.2f v=%.2f vy=%.2f hp=%d act=%s t=%u atk=%u gnd=%u",
-             i + 1,
-             p.x, p.y,
-             p.v, p.vy,
-             int(p.hp),
-             lab::app::ActionName(p.action),
-             p.stateTimer,
-             p.atkActive,
-             p.onGround);
-    }
-}
-
-// -------------------- Recv：只负责收包 -> 更新 ack/state -> 更新对手预测/触发回滚 --------------------
-static void OnUdp(void* user,
-                  const lab::net::UdpAddr& from,
-                  const uint8_t* data,
-                  size_t len) {
-    auto* ctx = static_cast<ClientCtx*>(user);
-
-    if (from.Key() != ctx->server.Key()) return;
-
-    if (auto sp = lab::net::DecodeStart(data, len)) {
-        if (sp->playerId == 0 || sp->playerId > ClientCtx::kMaxPlayers ||
-            sp->sessionId == 0 || sp->matchId == 0 || sp->maze.empty()) return;
-        if (ctx->sessionId != 0 && sp->sessionId != ctx->sessionId) return;
-        if (sp->matchId < ctx->matchId ||
-            (!ctx->hasStart && sp->matchId == ctx->matchId)) return;
-        ApplyStart(*ctx, *sp);
-        return;
-    }
-
-    if (auto reset = lab::net::DecodeReset(data, len)) {
-        ApplyReset(*ctx, *reset);
-        return;
-    }
-
-    // 1) ACK
-    if (auto ack = lab::net::DecodeAck(data, len)) {
-        if (!IsCurrentResponse(*ctx, ack->playerId, ack->sessionId, ack->matchId)) return;
-        ctx->lastServerTick = ack->serverTickProcessed;
-        ctx->lastServerHash = ack->serverStateHash;
-        ApplyAckNetworkStats(*ctx, *ack, Clock::NowSeconds());
-
-        if (ctx->lastServerTick % 60 == 0) {
-            LOGI("ACK: serverTick=%u lastInput=%u hash=%llu",
-                 ack->serverTickProcessed, ack->serverLastInputTick,
-                 (unsigned long long)ack->serverStateHash);
-        }
-
-        // hash 对账（仅当本地已存同 tick 的权威快照时才比对）
-        if (ctx->lastAuthoritativeTick == ack->serverTickProcessed) {
-            if (auto snap = ctx->stateHist.Get(ack->serverTickProcessed)) {
-                uint64_t h = Hasher::Hash(*snap);
-                if (h != ack->serverStateHash && ctx->lastHashMismatchTick != ack->serverTickProcessed) {
-                    ctx->hashMismatchCount++;
-                    ctx->lastHashMismatchTick = ack->serverTickProcessed;
-                    LOGW("Hash mismatch at tick=%u local=%llu server=%llu",
-                         ack->serverTickProcessed,
-                         (unsigned long long)h,
-                         (unsigned long long)ack->serverStateHash);
+        in_addr parsed{};
+        if (inet_pton(AF_INET, host.c_str(), &parsed) != 1)
+            throw std::runtime_error("--server requires IPv4[:port]");
+        SdlContext sdl;
+        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0 || TTF_Init() != 0 ||
+            !lab::app::InitRenderer(sdl.render, "Authority demo v6", font, 16))
+            throw std::runtime_error(std::string("SDL/font initialization: ") + SDL_GetError() +
+                                     " " + TTF_GetError());
+        ClientSession session(room);
+        session.SetSmoothing(smooth);
+        std::unique_ptr<ReplayWriter> recording;
+        unsigned segment = 0;
+        if (!recordFile.empty())
+            session.onRecord = [&](const WorldSnapshot &state, const std::vector<InputCmd> &inputs,
+                                   bool initial) {
+                if (initial) {
+                    if (recording)
+                        recording->Finish();
+                    auto path =
+                        segment ? recordFile + ".segment" + std::to_string(segment) : recordFile;
+                    ++segment;
+                    recording = std::make_unique<ReplayWriter>(path, state,
+                                                               IdentityJson(session.identity()));
+                } else if (recording)
+                    recording->Frame(state, inputs);
+            };
+        std::unique_ptr<ReplayPlayer> replay;
+        std::unique_ptr<ReplayPlayback> playback;
+        lab::net::UdpSocket socket;
+        auto server = lab::net::UdpAddr::FromIPv4(host, port);
+        if (!replayFile.empty()) {
+            replay = std::make_unique<ReplayPlayer>(replayFile);
+            playback = std::make_unique<ReplayPlayback>(*replay);
+        } else if (!socket.Open() || !socket.Bind(0) || !socket.SetNonBlocking(true))
+            throw std::runtime_error("client UDP initialization failed");
+        bool quit = false;
+        double previous = Clock::NowSeconds();
+        int frames = 0;
+        while (!quit && (!frameLimit || frames < frameLimit)) {
+            double now = Clock::NowSeconds(), elapsed = std::clamp(now - previous, 0.0, .25);
+            previous = now;
+            SDL_Event event;
+            while (SDL_PollEvent(&event)) {
+                if (event.type == SDL_QUIT)
+                    quit = true;
+                if (event.type == SDL_KEYDOWN && !event.key.repeat) {
+                    auto key = event.key.keysym.sym;
+                    if (key == SDLK_ESCAPE)
+                        quit = true;
+                    if (replay) {
+                        if (key == SDLK_SPACE)
+                            playback->Action(ReplayAction::TogglePause);
+                        if (key == SDLK_RIGHT)
+                            playback->Action(ReplayAction::SingleStep);
+                        if (key == SDLK_1)
+                            playback->Action(ReplayAction::HalfSpeed);
+                        if (key == SDLK_2)
+                            playback->Action(ReplayAction::NormalSpeed);
+                        if (key == SDLK_3)
+                            playback->Action(ReplayAction::DoubleSpeed);
+                        if (key == SDLK_r)
+                            playback->Action(ReplayAction::Restart);
+                    } else if (key == SDLK_f) {
+                        smooth = !smooth;
+                        session.SetSmoothing(smooth);
+                    }
                 }
             }
-        }
-        return;
-    }
-
-    // 2) STATE
-    if (auto st = lab::net::DecodeState(data, len)) {
-        if (!IsCurrentResponse(*ctx, st->playerId, st->sessionId, st->matchId)) return;
-        if (ctx->lastAuthoritativeTick != 0 && st->tick <= ctx->lastAuthoritativeTick) {
-            return;
-        }
-        ctx->netStats.stateDelayTicks = int32_t(ctx->tick) - int32_t(st->tick);
-
-        // 更新远端输入预测（逐 slot）
-        uint8_t localPid = ctx->localPlayerId ? ctx->localPlayerId : 1;
-        const size_t count = std::min<size_t>(st->players.size(), ClientCtx::kMaxPlayers);
-        for (size_t i = 0; i < count; ++i) {
-            uint8_t pid = static_cast<uint8_t>(i + 1);
-            if (pid == localPid) continue;
-            int8_t lastMoveX = ctx->remoteHasLast[pid - 1] ? ctx->remoteLast[pid - 1].moveX : 0;
-            int8_t lastMoveY = ctx->remoteHasLast[pid - 1] ? ctx->remoteLast[pid - 1].moveY : 0;
-            const float v = FromMM(st->players[i].v_mm);
-            if (st->players[i].onGround && std::fabs(v) < 0.01f) {
-                // 地面且速度极小，重置旧意图
-                lastMoveX = 0;
-                lastMoveY = 0;
+            lab::app::NetworkStats hud;
+            WorldSnapshot display;
+            if (replay) {
+                playback->Advance(elapsed);
+                display = replay->Snapshot();
+                hud.status = playback->playing() ? "replay playing" : "replay paused";
+                hud.detail = "hash " + std::to_string(Hasher::Hash(display)) + " speed " +
+                             std::to_string(playback->speed());
+                if (replay->difference()) {
+                    const auto &d = *replay->difference();
+                    hud.detail =
+                        "DIFF " + d.field + " " + d.expected.dump() + " / " + d.actual.dump();
+                }
+            } else {
+                lab::net::UdpAddr from;
+                Bytes bytes;
+                for (int n = 0; n < 1024 && socket.RecvFrom(from, bytes); ++n)
+                    session.HandleDatagram(bytes, from.Key() == server.Key(), now);
+                auto keys = SDL_GetKeyboardState(nullptr);
+                InputCmd input;
+                input.moveX = (keys[SDL_SCANCODE_D] || keys[SDL_SCANCODE_RIGHT]) -
+                              (keys[SDL_SCANCODE_A] || keys[SDL_SCANCODE_LEFT]);
+                input.moveY = (keys[SDL_SCANCODE_W] || keys[SDL_SCANCODE_UP]) -
+                              (keys[SDL_SCANCODE_S] || keys[SDL_SCANCODE_DOWN]);
+                input.buttons = keys[SDL_SCANCODE_SPACE] ? BIN_ATK : 0;
+                session.Update(input, now);
+                for (const auto &b : session.DrainOutgoing())
+                    socket.SendTo(server, b);
+                display = session.Display(now);
+                hud.rttMs = session.stats().rttMs;
+                hud.inputLeadTicks = Distance(session.next_tick() - 1, session.auth_tick());
+                hud.stateDelayTicks = static_cast<int32_t>(session.state_delay(now) / kStep);
+                hud.inputPacketsReceived = static_cast<uint32_t>(session.stats().packetsReceived);
+                hud.replayCostMs = session.stats().replayMs;
+                hud.replayTicks = session.stats().lastReplay;
+                hud.targetLead = session.target_lead();
+                hud.displayDelayMs = smooth ? 100 : 0;
+                hud.status = StateName(session.state());
+                hud.detail = "room " + std::to_string(room) + " | F smoothing " +
+                             (smooth ? "on" : "off") + " | " + session.reason();
             }
-            int8_t remoteMoveX = lab::app::PredictMoveXFromState(st->players[i], lastMoveX);
-            int8_t remoteMoveY = lab::app::PredictMoveYFromState(st->players[i], lastMoveY);
-
-            InputCmd rc;
-            rc.tick = st->tick;
-            rc.moveX = remoteMoveX;
-            rc.moveY = remoteMoveY;
-            rc.buttons = 0;
-            // 若远端已在空中，推断跳跃曾发生，避免预测阶段一直贴地
-            if (st->players[i].onGround == 0 && st->players[i].vy_mm > 0) {
-                rc.buttons |= BIN_JUMP;
-            }
-
-            ctx->remoteHist[pid - 1].Put(rc);
-            ctx->remoteHasLast[pid - 1] = 1;
-            ctx->remoteLast[pid - 1] = rc;
+            lab::app::RenderFrame(sdl.render, display, session.stats().corrections,
+                                  session.stats().invalidWire, &hud);
+            ++frames;
+            SDL_Delay(1);
         }
-
-        ApplyAuthoritativeState(*ctx, *st);
-        return;
-    }
-
-    // unknown -> ignore
-}
-
-static void SendHello(ClientCtx& ctx) {
-    lab::net::InputPacket p;
-    p.playerId = (ctx.localPlayerId != 0) ? ctx.localPlayerId : 1;
-    p.sessionId = ctx.sessionId;
-    p.matchId = 0;
-    p.newestTick = ctx.tick;
-    p.clientAckServerTick = ctx.lastServerTick;
-    p.count = 0;
-    auto bytes = lab::net::EncodeInput(p);
-    ctx.sock.SendTo(ctx.server, bytes);
-}
-
-static void PollInput(ClientCtx& ctx) {
-    ctx.input.moveX = 0;
-    ctx.input.moveY = 0;
-    ctx.input.attack = false;
-
-    SDL_Event e;
-    while (SDL_PollEvent(&e)) {
-        if (e.type == SDL_QUIT) {
-            ctx.running = false;
-        }
-    }
-
-    const Uint8* ks = SDL_GetKeyboardState(nullptr);
-    if (ks[SDL_SCANCODE_A] || ks[SDL_SCANCODE_LEFT]) ctx.input.moveX = -1;
-    if (ks[SDL_SCANCODE_D] || ks[SDL_SCANCODE_RIGHT]) ctx.input.moveX = +1;
-    if (ks[SDL_SCANCODE_W] || ks[SDL_SCANCODE_UP]) ctx.input.moveY = +1;
-    if (ks[SDL_SCANCODE_S] || ks[SDL_SCANCODE_DOWN]) ctx.input.moveY = -1;
-    ctx.input.attack = ks[SDL_SCANCODE_J] || ks[SDL_SCANCODE_K] || ks[SDL_SCANCODE_SPACE];
-}
-
-// -------------------- Send：tick 驱动采样输入 + 本地预测 + 发 InputPacket --------------------
-static void OnTick(evutil_socket_t, short, void* user) {
-    auto* ctx = static_cast<ClientCtx*>(user);
-
-    const double now = Clock::NowSeconds();
-    double frame = now - ctx->prev;
-    ctx->prev = now;
-    if (frame > ClientCtx::maxFrame) frame = ClientCtx::maxFrame;
-    ctx->acc += frame;
-
-    PollInput(*ctx);
-
-    if (!ctx->running) {
-        if (ctx->base) event_base_loopbreak(ctx->base);
-        return;
-    }
-
-    if (!ctx->hasStart) {
-        // 未收到开局信号，定期发 hello 让 server 分配 slot
-        if (now >= ctx->nextHelloSec) {
-            SendHello(*ctx);
-            ctx->nextHelloSec = now + 0.25;
-        }
-        lab::app::RenderFrame(ctx->render,
-                              ctx->worldPred.Snapshot(),
-                              ctx->rollbackCount,
-                              ctx->hashMismatchCount,
-                              &ctx->netStats);
-        return;
-    }
-
-    while (ctx->acc >= ClientCtx::dt) {
-        // 1) 采样本地输入（我自己的）
-        InputCmd localCmd{};
-        localCmd.tick = ctx->tick;
-        localCmd.moveX = ctx->input.moveX;
-        localCmd.moveY = ctx->input.moveY;
-        localCmd.buttons = 0;
-        if (ctx->input.attack) localCmd.buttons |= BIN_ATK;
-        ctx->localHist.Put(localCmd);
-
-        // 2) 远端输入预测（逐 slot）
-        std::vector<InputCmd> remoteCmds(ClientCtx::kMaxPlayers, InputBuffer::DefaultForTick(ctx->tick));
-        for (uint8_t pid = 1; pid <= ClientCtx::kMaxPlayers; ++pid) {
-            if (pid == ctx->localPlayerId) continue;
-            remoteCmds[pid - 1] = GetRemoteCmdForTick(*ctx, pid, ctx->tick);
-        }
-
-        // 3) 本地预测推进（多玩家）
-        auto cmds = BuildCmdVec(ctx->localPlayerId, localCmd, remoteCmds);
-        ctx->worldPred.Step(cmds, float(ClientCtx::dt));
-        ctx->stateHist.Put(ctx->worldPred.Snapshot());
-
-        // 4) 打包冗余输入（只发送“我自己的输入历史”）
-        lab::net::InputPacket p;
-        p.playerId = (ctx->localPlayerId != 0) ? ctx->localPlayerId : 1; // server 实际按 addr 分配，这里只是自描述
-        p.sessionId = ctx->sessionId;
-        p.matchId = ctx->matchId;
-        p.seq = ctx->inputSeq++;
-        p.newestTick = ctx->tick;
-        p.clientAckServerTick = ctx->lastServerTick;
-
-        p.cmds.clear();
-        p.cmds.reserve(ClientCtx::kRedundancy);
-        for (int i = 0; i < ClientCtx::kRedundancy; ++i) {
-            Tick t = (ctx->tick >= (Tick)i) ? (ctx->tick - (Tick)i) : 0;
-            auto c = ctx->localHist.Get(t).value_or(InputBuffer::DefaultForTick(t));
-            p.cmds.push_back(c);
-        }
-        p.count = (uint8_t)p.cmds.size();
-
-        auto bytes = lab::net::EncodeInput(p);
-        RememberSentInput(*ctx, ctx->tick, Clock::NowSeconds());
-        ctx->sock.SendTo(ctx->server, bytes);
-
-        ctx->tick++;
-        ctx->acc -= ClientCtx::dt;
-
-        if (ctx->tick % 60 == 0) {
-            const int32_t lead = int32_t(ctx->tick) - int32_t(ctx->lastServerTick);
-            LOGI("STAT tick=%u lead=%d rtt=%.1fms loss=%.1f%% state_delay=%d replay=%u/%.2fms rollbacks=%u last_rb=%u hash_mismatch=%u last_hash=%u",
-                 ctx->tick,
-                 lead,
-                 ctx->netStats.rttMs,
-                 ctx->netStats.packetLossPct,
-                 ctx->netStats.stateDelayTicks,
-                 ctx->netStats.replayTicks,
-                 ctx->netStats.replayCostMs,
-                 ctx->rollbackCount,
-                 ctx->lastRollbackTick,
-                 ctx->hashMismatchCount,
-                 ctx->lastHashMismatchTick);
-            PrintHud(*ctx);
-        }
-    }
-
-    lab::app::RenderFrame(ctx->render,
-                          ctx->worldPred.Snapshot(),
-                          ctx->rollbackCount,
-                          ctx->hashMismatchCount,
-                          &ctx->netStats);
-}
-
-int main(int argc, char** argv) {
-    (void)argc;
-    (void)argv;
-    std::string serverIp = "127.0.0.1";
-    uint16_t serverPort = 40000;
-
-    event_base* base = event_base_new();
-    if (!base) {
-        LOGE("Client: event_base_new failed");
+        if (recording)
+            recording->Finish();
+        return replay && replay->difference() ? 1 : 0;
+    } catch (const std::exception &e) {
+        std::cerr << e.what() << '\n';
         return 1;
     }
-
-    ClientCtx ctx;
-    ctx.server = lab::net::UdpAddr::FromIPv4(serverIp, serverPort);
-    ctx.prev = Clock::NowSeconds();
-    ctx.acc = 0.0;
-    ctx.base = base;
-
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0) {
-        LOGE("SDL_Init failed: %s", SDL_GetError());
-        return 1;
-    }
-    if (TTF_Init() != 0) {
-        LOGE("TTF_Init failed: %s", TTF_GetError());
-        SDL_Quit();
-        return 1;
-    }
-
-    const char* fontPath = "/System/Library/Fonts/Menlo.ttc";
-    if (!lab::app::InitRenderer(ctx.render, "Lab Client", fontPath, 14)) {
-        LOGW("Renderer init failed (font=%s)", fontPath);
-    }
-
-    ctx.remoteHist.reserve(ClientCtx::kMaxPlayers);
-    ctx.remoteHasLast.assign(ClientCtx::kMaxPlayers, 0);
-    ctx.remoteLast.assign(ClientCtx::kMaxPlayers, InputCmd{});
-    for (uint8_t i = 0; i < ClientCtx::kMaxPlayers; ++i) {
-        ctx.remoteHist.emplace_back(4096);
-    }
-
-    if (!ctx.sock.Open() || !ctx.sock.Bind(0 /*ephemeral*/) || !ctx.sock.SetNonBlocking(true)) {
-        LOGE("Client: failed to open/bind UDP");
-        event_base_free(base);
-        return 1;
-    }
-    ctx.sock.SetRecvBuf(1 << 20);
-    ctx.sock.SetSendBuf(1 << 20);
-
-    LOGI("Client -> Server %s", ctx.server.ToString().c_str());
-
-    if (!ctx.sock.StartEventRead(base, &OnUdp, &ctx)) {
-        LOGE("Client: StartEventRead failed");
-        event_base_free(base);
-        return 1;
-    }
-
-    event* evTick = event_new(base, -1, EV_PERSIST, &OnTick, &ctx);
-    if (!evTick) {
-        LOGE("Client: event_new(tick) failed");
-        event_base_free(base);
-        return 1;
-    }
-    timeval tv{};
-    tv.tv_sec = 0;
-    tv.tv_usec = 1000; // 1ms
-    event_add(evTick, &tv);
-
-    event_base_dispatch(base);
-
-    event_free(evTick);
-    event_base_free(base);
-    lab::app::ShutdownRenderer(ctx.render);
-    TTF_Quit();
-    SDL_Quit();
-    return 0;
 }

@@ -1,0 +1,636 @@
+{
+  "determinism": "virtual events and functional statistics; measured duration excluded",
+  "protocol": 6,
+  "results": [
+    {
+      "clients": [
+        {
+          "bytesReceived": 1903446,
+          "bytesSent": 1442374,
+          "corrections": 136,
+          "duplicate": 11,
+          "hash": 4633437664616954998,
+          "invalidWire": 0,
+          "late": 32,
+          "nextTick": 3063,
+          "packetsReceived": 1498,
+          "packetsSent": 3063,
+          "reconnects": 0,
+          "rejected": 1,
+          "replayFrames": 8725,
+          "replayMs": 0.7056779999999984,
+          "resyncs": 0,
+          "sameFramePositionErrorP50": 0.0,
+          "sameFramePositionErrorP95": 0.00063323974609375,
+          "sameFramePositionErrorP99": 0.0008850321173667908,
+          "state": "playing"
+        },
+        {
+          "bytesReceived": 1886880,
+          "bytesSent": 1441076,
+          "corrections": 105,
+          "duplicate": 16,
+          "hash": 4633437664616954998,
+          "invalidWire": 0,
+          "late": 45,
+          "nextTick": 3063,
+          "packetsReceived": 1485,
+          "packetsSent": 3061,
+          "reconnects": 0,
+          "rejected": 0,
+          "replayFrames": 8623,
+          "replayMs": 0.7157639999999974,
+          "resyncs": 0,
+          "sameFramePositionErrorP50": 0.0,
+          "sameFramePositionErrorP95": 0.0005955696105957031,
+          "sameFramePositionErrorP99": 0.0008702278137207031,
+          "state": "playing"
+        }
+      ],
+      "config": {
+        "downstream": {
+          "duplicate": 0.01,
+          "jitterMs": 20.0,
+          "latencyMs": 25.0,
+          "loss": 0.0,
+          "reorder": 0.02
+        },
+        "seed": 1,
+        "upstream": {
+          "duplicate": 0.01,
+          "jitterMs": 20.0,
+          "latencyMs": 25.0,
+          "loss": 0.0,
+          "reorder": 0.02
+        }
+      },
+      "eventDigest": 564480639863745962,
+      "healthyTailTicks": 60,
+      "ok": true,
+      "recoveryMs": 16.666666666666668,
+      "serverHash": 2561284523665243971,
+      "serverRejected": 0,
+      "ticks": 3000
+    },
+    {
+      "clients": [
+        {
+          "bytesReceived": 1874482,
+          "bytesSent": 1442390,
+          "corrections": 119,
+          "duplicate": 16,
+          "hash": 6389808021071471680,
+          "invalidWire": 0,
+          "late": 38,
+          "nextTick": 3063,
+          "packetsReceived": 1475,
+          "packetsSent": 3063,
+          "reconnects": 0,
+          "rejected": 1,
+          "replayFrames": 8442,
+          "replayMs": 0.6378629999999995,
+          "resyncs": 0,
+          "sameFramePositionErrorP50": 0.0,
+          "sameFramePositionErrorP95": 0.0006026625633239746,
+          "sameFramePositionErrorP99": 0.0008653402328491211,
+          "state": "playing"
+        },
+        {
+          "bytesReceived": 1880733,
+          "bytesSent": 1440614,
+          "corrections": 108,
+          "duplicate": 16,
+          "hash": 17021192088692664649,
+          "invalidWire": 0,
+          "late": 41,
+          "nextTick": 3062,
+          "packetsReceived": 1480,
+          "packetsSent": 3060,
+          "reconnects": 0,
+          "rejected": 0,
+          "replayFrames": 8683,
+          "replayMs": 0.6604249999999985,
+          "resyncs": 0,
+          "sameFramePositionErrorP50": 0.0,
+          "sameFramePositionErrorP95": 0.0005712509155273438,
+          "sameFramePositionErrorP99": 0.0008652210235595703,
+          "state": "playing"
+        }
+      ],
+      "config": {
+        "downstream": {
+          "duplicate": 0.01,
+          "jitterMs": 20.0,
+          "latencyMs": 25.0,
+          "loss": 0.01,
+          "reorder": 0.02
+        },
+        "seed": 1,
+        "upstream": {
+          "duplicate": 0.01,
+          "jitterMs": 20.0,
+          "latencyMs": 25.0,
+          "loss": 0.01,
+          "reorder": 0.02
+        }
+      },
+      "eventDigest": 1322267901443617873,
+      "healthyTailTicks": 60,
+      "ok": true,
+      "recoveryMs": 0.0,
+      "serverHash": 3711910039526481653,
+      "serverRejected": 0,
+      "ticks": 3000
+    },
+    {
+      "clients": [
+        {
+          "bytesReceived": 1804408,
+          "bytesSent": 1442390,
+          "corrections": 119,
+          "duplicate": 20,
+          "hash": 2066578951066869937,
+          "invalidWire": 0,
+          "late": 44,
+          "nextTick": 3063,
+          "packetsReceived": 1419,
+          "packetsSent": 3063,
+          "reconnects": 0,
+          "rejected": 1,
+          "replayFrames": 8358,
+          "replayMs": 0.6145540000000007,
+          "resyncs": 0,
+          "sameFramePositionErrorP50": 0.0,
+          "sameFramePositionErrorP95": 0.0006031990051269531,
+          "sameFramePositionErrorP99": 0.000873565673828125,
+          "state": "playing"
+        },
+        {
+          "bytesReceived": 1831346,
+          "bytesSent": 1441072,
+          "corrections": 111,
+          "duplicate": 17,
+          "hash": 2066578951066869937,
+          "invalidWire": 0,
+          "late": 36,
+          "nextTick": 3063,
+          "packetsReceived": 1440,
+          "packetsSent": 3061,
+          "reconnects": 0,
+          "rejected": 0,
+          "replayFrames": 8384,
+          "replayMs": 0.6365289999999992,
+          "resyncs": 0,
+          "sameFramePositionErrorP50": 0.0,
+          "sameFramePositionErrorP95": 0.0006108283996582031,
+          "sameFramePositionErrorP99": 0.0008652210235595703,
+          "state": "playing"
+        }
+      ],
+      "config": {
+        "downstream": {
+          "duplicate": 0.01,
+          "jitterMs": 20.0,
+          "latencyMs": 25.0,
+          "loss": 0.05,
+          "reorder": 0.02
+        },
+        "seed": 1,
+        "upstream": {
+          "duplicate": 0.01,
+          "jitterMs": 20.0,
+          "latencyMs": 25.0,
+          "loss": 0.05,
+          "reorder": 0.02
+        }
+      },
+      "eventDigest": 3064142007724436645,
+      "healthyTailTicks": 60,
+      "ok": true,
+      "recoveryMs": 0.0,
+      "serverHash": 11438814113731663392,
+      "serverRejected": 0,
+      "ticks": 3000
+    },
+    {
+      "clients": [
+        {
+          "bytesReceived": 1883440,
+          "bytesSent": 1441920,
+          "corrections": 111,
+          "duplicate": 20,
+          "hash": 1775469193701436052,
+          "invalidWire": 0,
+          "late": 46,
+          "nextTick": 3062,
+          "packetsReceived": 1482,
+          "packetsSent": 3062,
+          "reconnects": 0,
+          "rejected": 1,
+          "replayFrames": 12943,
+          "replayMs": 0.8948099999999957,
+          "resyncs": 0,
+          "sameFramePositionErrorP50": 0.0,
+          "sameFramePositionErrorP95": 0.0005966703756712377,
+          "sameFramePositionErrorP99": 0.0008449158631265163,
+          "state": "playing"
+        },
+        {
+          "bytesReceived": 1893435,
+          "bytesSent": 1441538,
+          "corrections": 108,
+          "duplicate": 10,
+          "hash": 1775469193701436052,
+          "invalidWire": 0,
+          "late": 39,
+          "nextTick": 3062,
+          "packetsReceived": 1490,
+          "packetsSent": 3062,
+          "reconnects": 0,
+          "rejected": 0,
+          "replayFrames": 12788,
+          "replayMs": 0.8764389999999962,
+          "resyncs": 0,
+          "sameFramePositionErrorP50": 0.0,
+          "sameFramePositionErrorP95": 0.0005816221237182617,
+          "sameFramePositionErrorP99": 0.0008702278137207031,
+          "state": "playing"
+        }
+      ],
+      "config": {
+        "downstream": {
+          "duplicate": 0.01,
+          "jitterMs": 20.0,
+          "latencyMs": 50.0,
+          "loss": 0.0,
+          "reorder": 0.02
+        },
+        "seed": 1,
+        "upstream": {
+          "duplicate": 0.01,
+          "jitterMs": 20.0,
+          "latencyMs": 50.0,
+          "loss": 0.0,
+          "reorder": 0.02
+        }
+      },
+      "eventDigest": 7493235650027397767,
+      "healthyTailTicks": 60,
+      "ok": true,
+      "recoveryMs": 16.666666666666668,
+      "serverHash": 6569814959432612419,
+      "serverRejected": 2,
+      "ticks": 3000
+    },
+    {
+      "clients": [
+        {
+          "bytesReceived": 1873914,
+          "bytesSent": 1441928,
+          "corrections": 120,
+          "duplicate": 13,
+          "hash": 10234905450392235389,
+          "invalidWire": 0,
+          "late": 45,
+          "nextTick": 3062,
+          "packetsReceived": 1474,
+          "packetsSent": 3062,
+          "reconnects": 0,
+          "rejected": 1,
+          "replayFrames": 12686,
+          "replayMs": 0.8949369999999944,
+          "resyncs": 0,
+          "sameFramePositionErrorP50": 0.0,
+          "sameFramePositionErrorP95": 0.0006026625633239746,
+          "sameFramePositionErrorP99": 0.0008652210235595703,
+          "state": "playing"
+        },
+        {
+          "bytesReceived": 1866378,
+          "bytesSent": 1441562,
+          "corrections": 113,
+          "duplicate": 15,
+          "hash": 10234905450392235389,
+          "invalidWire": 0,
+          "late": 48,
+          "nextTick": 3062,
+          "packetsReceived": 1468,
+          "packetsSent": 3062,
+          "reconnects": 0,
+          "rejected": 0,
+          "replayFrames": 12694,
+          "replayMs": 0.8744599999999958,
+          "resyncs": 0,
+          "sameFramePositionErrorP50": 0.0,
+          "sameFramePositionErrorP95": 0.0006108283996582031,
+          "sameFramePositionErrorP99": 0.0008702278137207031,
+          "state": "playing"
+        }
+      ],
+      "config": {
+        "downstream": {
+          "duplicate": 0.01,
+          "jitterMs": 20.0,
+          "latencyMs": 50.0,
+          "loss": 0.01,
+          "reorder": 0.02
+        },
+        "seed": 1,
+        "upstream": {
+          "duplicate": 0.01,
+          "jitterMs": 20.0,
+          "latencyMs": 50.0,
+          "loss": 0.01,
+          "reorder": 0.02
+        }
+      },
+      "eventDigest": 5823445487568591570,
+      "healthyTailTicks": 60,
+      "ok": true,
+      "recoveryMs": 16.666666666666668,
+      "serverHash": 16503194849331991458,
+      "serverRejected": 2,
+      "ticks": 3000
+    },
+    {
+      "clients": [
+        {
+          "bytesReceived": 1822324,
+          "bytesSent": 1441932,
+          "corrections": 115,
+          "duplicate": 12,
+          "hash": 7438777897092424909,
+          "invalidWire": 0,
+          "late": 45,
+          "nextTick": 3062,
+          "packetsReceived": 1432,
+          "packetsSent": 3062,
+          "reconnects": 0,
+          "rejected": 1,
+          "replayFrames": 12541,
+          "replayMs": 0.8707639999999979,
+          "resyncs": 0,
+          "sameFramePositionErrorP50": 0.0,
+          "sameFramePositionErrorP95": 0.0005966703756712377,
+          "sameFramePositionErrorP99": 0.0008704662322998047,
+          "state": "playing"
+        },
+        {
+          "bytesReceived": 1797619,
+          "bytesSent": 1441546,
+          "corrections": 127,
+          "duplicate": 18,
+          "hash": 7438777897092424909,
+          "invalidWire": 0,
+          "late": 37,
+          "nextTick": 3062,
+          "packetsReceived": 1413,
+          "packetsSent": 3062,
+          "reconnects": 0,
+          "rejected": 0,
+          "replayFrames": 12304,
+          "replayMs": 0.8521909999999976,
+          "resyncs": 0,
+          "sameFramePositionErrorP50": 0.0,
+          "sameFramePositionErrorP95": 0.0006078673177398741,
+          "sameFramePositionErrorP99": 0.0008652210235595703,
+          "state": "playing"
+        }
+      ],
+      "config": {
+        "downstream": {
+          "duplicate": 0.01,
+          "jitterMs": 20.0,
+          "latencyMs": 50.0,
+          "loss": 0.05,
+          "reorder": 0.02
+        },
+        "seed": 1,
+        "upstream": {
+          "duplicate": 0.01,
+          "jitterMs": 20.0,
+          "latencyMs": 50.0,
+          "loss": 0.05,
+          "reorder": 0.02
+        }
+      },
+      "eventDigest": 8362900340947889597,
+      "healthyTailTicks": 60,
+      "ok": true,
+      "recoveryMs": 16.666666666666668,
+      "serverHash": 4805256845126530294,
+      "serverRejected": 2,
+      "ticks": 3000
+    },
+    {
+      "clients": [
+        {
+          "bytesReceived": 1882908,
+          "bytesSent": 1440988,
+          "corrections": 123,
+          "duplicate": 14,
+          "hash": 10192544849043321205,
+          "invalidWire": 0,
+          "late": 47,
+          "nextTick": 3060,
+          "packetsReceived": 1480,
+          "packetsSent": 3060,
+          "reconnects": 0,
+          "rejected": 1,
+          "replayFrames": 17391,
+          "replayMs": 1.150838999999995,
+          "resyncs": 0,
+          "sameFramePositionErrorP50": 0.0,
+          "sameFramePositionErrorP95": 0.00060272216796875,
+          "sameFramePositionErrorP99": 0.0009040087461471558,
+          "state": "playing"
+        },
+        {
+          "bytesReceived": 1892969,
+          "bytesSent": 1439662,
+          "corrections": 109,
+          "duplicate": 14,
+          "hash": 10192544849043321205,
+          "invalidWire": 0,
+          "late": 43,
+          "nextTick": 3060,
+          "packetsReceived": 1488,
+          "packetsSent": 3058,
+          "reconnects": 0,
+          "rejected": 0,
+          "replayFrames": 17383,
+          "replayMs": 1.145656999999995,
+          "resyncs": 0,
+          "sameFramePositionErrorP50": 0.0,
+          "sameFramePositionErrorP95": 0.0006026625633239746,
+          "sameFramePositionErrorP99": 0.0009145736694335938,
+          "state": "playing"
+        }
+      ],
+      "config": {
+        "downstream": {
+          "duplicate": 0.01,
+          "jitterMs": 20.0,
+          "latencyMs": 75.0,
+          "loss": 0.0,
+          "reorder": 0.02
+        },
+        "seed": 1,
+        "upstream": {
+          "duplicate": 0.01,
+          "jitterMs": 20.0,
+          "latencyMs": 75.0,
+          "loss": 0.0,
+          "reorder": 0.02
+        }
+      },
+      "eventDigest": 8337514062048591539,
+      "healthyTailTicks": 60,
+      "ok": true,
+      "recoveryMs": 33.333333333333336,
+      "serverHash": 3613714080384182410,
+      "serverRejected": 13,
+      "ticks": 3000
+    },
+    {
+      "clients": [
+        {
+          "bytesReceived": 1874992,
+          "bytesSent": 1440944,
+          "corrections": 123,
+          "duplicate": 18,
+          "hash": 1816506508790211538,
+          "invalidWire": 0,
+          "late": 40,
+          "nextTick": 3060,
+          "packetsReceived": 1475,
+          "packetsSent": 3060,
+          "reconnects": 0,
+          "rejected": 1,
+          "replayFrames": 17210,
+          "replayMs": 1.1482389999999947,
+          "resyncs": 0,
+          "sameFramePositionErrorP50": 0.0,
+          "sameFramePositionErrorP95": 0.0006120204925537109,
+          "sameFramePositionErrorP99": 0.0008652210235595703,
+          "state": "playing"
+        },
+        {
+          "bytesReceived": 1886223,
+          "bytesSent": 1439650,
+          "corrections": 123,
+          "duplicate": 9,
+          "hash": 1816506508790211538,
+          "invalidWire": 0,
+          "late": 36,
+          "nextTick": 3060,
+          "packetsReceived": 1484,
+          "packetsSent": 3058,
+          "reconnects": 0,
+          "rejected": 0,
+          "replayFrames": 17340,
+          "replayMs": 1.137126999999994,
+          "resyncs": 0,
+          "sameFramePositionErrorP50": 0.0,
+          "sameFramePositionErrorP95": 0.0006108283996582031,
+          "sameFramePositionErrorP99": 0.0008702278137207031,
+          "state": "playing"
+        }
+      ],
+      "config": {
+        "downstream": {
+          "duplicate": 0.01,
+          "jitterMs": 20.0,
+          "latencyMs": 75.0,
+          "loss": 0.01,
+          "reorder": 0.02
+        },
+        "seed": 1,
+        "upstream": {
+          "duplicate": 0.01,
+          "jitterMs": 20.0,
+          "latencyMs": 75.0,
+          "loss": 0.01,
+          "reorder": 0.02
+        }
+      },
+      "eventDigest": 5807264050168159368,
+      "healthyTailTicks": 60,
+      "ok": true,
+      "recoveryMs": 33.333333333333336,
+      "serverHash": 1657561542067188489,
+      "serverRejected": 13,
+      "ticks": 3000
+    },
+    {
+      "clients": [
+        {
+          "bytesReceived": 1823590,
+          "bytesSent": 1440960,
+          "corrections": 119,
+          "duplicate": 18,
+          "hash": 14700384717056787720,
+          "invalidWire": 0,
+          "late": 29,
+          "nextTick": 3060,
+          "packetsReceived": 1434,
+          "packetsSent": 3060,
+          "reconnects": 0,
+          "rejected": 1,
+          "replayFrames": 16862,
+          "replayMs": 1.1293579999999948,
+          "resyncs": 0,
+          "sameFramePositionErrorP50": 0.0,
+          "sameFramePositionErrorP95": 0.0006198883056640625,
+          "sameFramePositionErrorP99": 0.000873565673828125,
+          "state": "playing"
+        },
+        {
+          "bytesReceived": 1805748,
+          "bytesSent": 1439646,
+          "corrections": 102,
+          "duplicate": 10,
+          "hash": 14700384717056787720,
+          "invalidWire": 0,
+          "late": 53,
+          "nextTick": 3060,
+          "packetsReceived": 1420,
+          "packetsSent": 3058,
+          "reconnects": 0,
+          "rejected": 0,
+          "replayFrames": 16574,
+          "replayMs": 1.1058249999999985,
+          "resyncs": 0,
+          "sameFramePositionErrorP50": 0.0,
+          "sameFramePositionErrorP95": 0.0005979537963867188,
+          "sameFramePositionErrorP99": 0.0008705854415893555,
+          "state": "playing"
+        }
+      ],
+      "config": {
+        "downstream": {
+          "duplicate": 0.01,
+          "jitterMs": 20.0,
+          "latencyMs": 75.0,
+          "loss": 0.05,
+          "reorder": 0.02
+        },
+        "seed": 1,
+        "upstream": {
+          "duplicate": 0.01,
+          "jitterMs": 20.0,
+          "latencyMs": 75.0,
+          "loss": 0.05,
+          "reorder": 0.02
+        }
+      },
+      "eventDigest": 8508581537259215135,
+      "healthyTailTicks": 60,
+      "ok": true,
+      "recoveryMs": 33.333333333333336,
+      "serverHash": 11788897263939114707,
+      "serverRejected": 12,
+      "ticks": 3000
+    }
+  ]
+}

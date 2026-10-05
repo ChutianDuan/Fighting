@@ -12,7 +12,7 @@ void InputBuffer::Put(const InputCmd& cmd) {
 std::optional<InputCmd> InputBuffer::Get(Tick tick) const {
   const size_t idx = size_t(tick % cap_);
   if (!ring_[idx].valid) return std::nullopt;
-  if (ring_[idx].cmd.tick != tick) return std::nullopt; // 环覆盖后要判 tick
+  if (ring_[idx].cmd.tick != tick) return std::nullopt; // 相同取模下标不代表同一帧
   return ring_[idx].cmd;
 }
 

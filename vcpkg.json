@@ -1,0 +1,10 @@
+{
+  "name": "fighter-netcode-demo",
+  "version-string": "0.1.0",
+  "dependencies": [
+    "libevent",
+    "nlohmann-json",
+    "sdl2",
+    "sdl2-ttf"
+  ]
+}

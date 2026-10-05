@@ -1,94 +1,84 @@
-#include <algorithm>
-#include <cstdint>
-#include <vector>
-
+#include <csignal>
 #include <event2/event.h>
-#include <event2/util.h>
-
-#include <lab/net/UdpSocket.h>
-#include <lab/server/AuthoritativeServer.h>
+#include <filesystem>
+#include <iostream>
+#include <lab/session/Replay.h>
+#include <lab/session/ServerRuntime.h>
 #include <lab/time/Clock.h>
-#include <lab/util/log.h>
-
+#include <memory>
+using namespace lab::session;
 namespace {
-
-struct ServerApp {
-  lab::net::UdpSocket socket;
-  lab::server::AuthoritativeServer server;
-  double previousSec = 0.0;
-  double accumulatorSec = 0.0;
-};
-
-void SendAll(ServerApp& app,
-             const std::vector<lab::server::OutboundDatagram>& datagrams) {
-  for (const auto& datagram : datagrams) {
-    if (!app.socket.SendTo(datagram.to, datagram.bytes)) {
-      LOGW("Server send failed: %s", datagram.to.ToString().c_str());
-    }
-  }
+void TimerTick(evutil_socket_t, short, void *user) {
+    static_cast<ServerRuntime *>(user)->Poll(Clock::NowSeconds());
 }
-
-void OnUdp(void* user,
-           const lab::net::UdpAddr& from,
-           const uint8_t* data,
-           size_t length) {
-  auto& app = *static_cast<ServerApp*>(user);
-  SendAll(app, app.server.HandleDatagram(from, data, length, Clock::NowSeconds()));
+void Stop(evutil_socket_t, short, void *user) {
+    event_base_loopbreak(static_cast<event_base *>(user));
 }
-
-void OnTick(evutil_socket_t, short, void* user) {
-  auto& app = *static_cast<ServerApp*>(user);
-  const double nowSec = Clock::NowSeconds();
-  const double elapsedSec = std::min(nowSec - app.previousSec, 0.25);
-  app.previousSec = nowSec;
-  app.accumulatorSec += std::max(0.0, elapsedSec);
-
-  SendAll(app, app.server.ExpireClients(nowSec));
-  constexpr double tickSec = 1.0 / 60.0;
-  while (app.accumulatorSec >= tickSec) {
-    SendAll(app, app.server.AdvanceOneTick());
-    app.accumulatorSec -= tickSec;
-  }
-}
-
 } // namespace
-
-int main() {
-  constexpr uint16_t port = 40000;
-  event_base* base = event_base_new();
-  if (!base) {
-    LOGE("Server: event_base_new failed");
-    return 1;
-  }
-
-  ServerApp app;
-  app.previousSec = Clock::NowSeconds();
-  if (!app.socket.Open() || !app.socket.Bind(port) ||
-      !app.socket.SetNonBlocking(true)) {
-    LOGE("Server: failed to open/bind UDP port=%u", port);
-    event_base_free(base);
-    return 1;
-  }
-  app.socket.SetRecvBuf(1 << 20);
-  app.socket.SetSendBuf(1 << 20);
-  if (!app.socket.StartEventRead(base, &OnUdp, &app)) {
-    LOGE("Server: StartEventRead failed");
-    event_base_free(base);
-    return 1;
-  }
-
-  event* tickEvent = event_new(base, -1, EV_PERSIST, &OnTick, &app);
-  timeval interval{0, 1000};
-  if (!tickEvent || event_add(tickEvent, &interval) != 0) {
-    LOGE("Server: failed to register tick event");
-    if (tickEvent) event_free(tickEvent);
-    event_base_free(base);
-    return 1;
-  }
-
-  LOGI("Server listening on 0.0.0.0:%u", port);
-  event_base_dispatch(base);
-  event_free(tickEvent);
-  event_base_free(base);
-  return 0;
+int main(int argc, char **argv) {
+    try {
+        uint16_t port = 40000;
+        ServerConfig config;
+        std::string directory;
+        for (int i = 1; i < argc; ++i) {
+            std::string arg = argv[i];
+            if (i + 1 >= argc)
+                throw std::runtime_error("missing option value");
+            std::string value = argv[++i];
+            if (arg == "--port") {
+                auto p = std::stoul(value);
+                if (!p || p > 65535)
+                    throw std::runtime_error("invalid port");
+                port = p;
+            } else if (arg == "--max-rooms")
+                config.maxRooms = std::stoul(value);
+            else if (arg == "--record-dir")
+                directory = value;
+            else
+                throw std::runtime_error("unknown option: " + arg);
+        }
+        // base 先创建最后释放；定时/信号事件先释放，socket 读事件随后停止。
+        std::unique_ptr<event_base, decltype(&event_base_free)> base(event_base_new(),
+                                                                     event_base_free);
+        if (!base)
+            throw std::runtime_error("event_base_new failed");
+        ServerRuntime app(config);
+        if (!app.Open(port) || !app.Attach(base.get()))
+            throw std::runtime_error("UDP initialization failed");
+        std::map<uint32_t, std::unique_ptr<ReplayWriter>> recordings;
+        if (!directory.empty()) {
+            std::filesystem::create_directories(directory);
+            app.server.onStart = [&](uint32_t room, uint32_t match, const WorldSnapshot &s,
+                                     const std::vector<InputCmd> &) {
+                auto path = std::filesystem::path(directory) /
+                            ("instance" + std::to_string(app.server.instance()) + "_room" +
+                             std::to_string(room) + "_match" + std::to_string(match) + ".jsonl");
+                recordings[room] = std::make_unique<ReplayWriter>(
+                    path.string(), s,
+                    Json{{"instance", app.server.instance()}, {"room", room}, {"match", match}});
+            };
+            app.server.onFrame = [&](uint32_t room, uint32_t, const WorldSnapshot &s,
+                                     const std::vector<InputCmd> &inputs) {
+                recordings.at(room)->Frame(s, inputs);
+            };
+        }
+        using Event = std::unique_ptr<event, decltype(&event_free)>;
+        Event timer(event_new(base.get(), -1, EV_PERSIST, TimerTick, &app), event_free);
+        Event interrupt(evsignal_new(base.get(), SIGINT, Stop, base.get()), event_free);
+        Event terminate(evsignal_new(base.get(), SIGTERM, Stop, base.get()), event_free);
+        timeval interval{0, 1000};
+        if (!timer || !interrupt || !terminate || event_add(timer.get(), &interval) != 0 ||
+            event_add(interrupt.get(), nullptr) != 0 || event_add(terminate.get(), nullptr) != 0)
+            throw std::runtime_error("event initialization failed");
+        std::cout << "v6 server UDP port " << port << ", room limit " << config.maxRooms << '\n';
+        event_base_dispatch(base.get());
+        for (auto &[room, writer] : recordings) {
+            (void)room;
+            writer->Finish();
+        }
+        return 0;
+    } catch (const std::exception &e) {
+        std::cerr << e.what() << '\n';
+        return 1;
+    }
 }

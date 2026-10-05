@@ -7,7 +7,7 @@
 namespace lab::net {
 
 static void WriteU32(std::vector<uint8_t>& b, uint32_t v) {
-  //
+  // 转成网络字节序后写入字节数组，独立于主机端序与结构体对齐。
   uint32_t x = htonl(v);
   uint8_t* p = reinterpret_cast<uint8_t*>(&x);
   b.insert(b.end(), p, p + 4);
@@ -20,7 +20,7 @@ static void WriteU16(std::vector<uint8_t>& b, uint16_t v) {
 static void WriteU8(std::vector<uint8_t>& b, uint8_t v) { b.push_back(v); }
 static void WriteI8(std::vector<uint8_t>& b, int8_t v) { b.push_back((uint8_t)v); }
 static void WriteU64(std::vector<uint8_t>& b, uint64_t v) {
-  // 兼容写法：拆成两个 u32
+  // 高 32 位在前、低 32 位在后，各自使用网络字节序。
   uint32_t hi = uint32_t(v >> 32);
   uint32_t lo = uint32_t(v & 0xffffffffu);
   WriteU32(b, hi);
@@ -218,7 +218,7 @@ std::vector<uint8_t> EncodeState(const StatePacket& s) {
   std::vector<uint8_t> b;
   const uint8_t count = static_cast<uint8_t>(std::min<size_t>(s.playerCount, s.players.size()));
   
-  // 通过设置和玩家列表中选取最小作为 玩家数量，动态扩容
+  // 数量字段与容器大小取最小值，确保不读取容器范围之外的数据。
   const uint8_t projCount = static_cast<uint8_t>(std::min<size_t>(s.projectileCount, s.projectiles.size()));
   b.reserve(32 + size_t(count) * 27 + size_t(projCount) * 18);
   WriteHeader(b, PacketType::State);

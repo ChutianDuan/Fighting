@@ -65,7 +65,7 @@ bool UdpSocket::Bind(uint16_t port, const std::string& bindIp) {
 bool UdpSocket::SetNonBlocking(bool on) {
   if (fd_ < 0) return false;
 
-  // 推荐用 libevent util（跨平台更稳）；但这里保留你原有语义
+  // 非阻塞用于事件驱动读空队列；恢复阻塞模式使用 POSIX fcntl。
   if (on) {
     return evutil_make_socket_nonblocking(fd_) == 0;
   } else {
@@ -98,7 +98,7 @@ bool UdpSocket::SendTo(const UdpAddr& to, const std::vector<uint8_t>& buf) {
 bool UdpSocket::RecvFrom(UdpAddr& from, std::vector<uint8_t>& out) {
   if (fd_ < 0) return false;
 
-  uint8_t buf[2048];
+  uint8_t buf[16385];
   socklen_t sl = sizeof(from.addr);
   ssize_t n = ::recvfrom(fd_, buf, sizeof(buf), 0, (sockaddr*)&from.addr, &sl);
 
@@ -138,7 +138,7 @@ bool UdpSocket::StartEventRead(event_base* base, OnDatagramFn fn, void* user) {
   on_datagram_ = fn;
   on_user_ = user;
 
-  // 监听可读事件，持久化（一直触发）
+  // EV_PERSIST 保留事件注册，不代表数据报会被重试或可靠送达。
   ev_read_ = event_new(base_, fd_, EV_READ | EV_PERSIST, &UdpSocket::ReadCb, this);
   if (!ev_read_) {
     base_ = nullptr;
@@ -180,10 +180,10 @@ void UdpSocket::HandleReadable() {
     // 没有回调就把数据读空丢弃，避免 event 反复触发（通常不应发生）
   }
 
-  // 必须循环 recv 到 EAGAIN/EWOULDBLOCK，否则 backlog 堆积会导致事件频繁触发
+  // 一次可读通知可能对应多个数据报；持续读取直到队列为空。
   for (;;) {
     UdpAddr from{};
-    uint8_t buf[2048];
+    uint8_t buf[16385];
     socklen_t sl = sizeof(from.addr);
     ssize_t n = ::recvfrom(fd_, buf, sizeof(buf), 0, (sockaddr*)&from.addr, &sl);
 
@@ -199,6 +199,7 @@ void UdpSocket::HandleReadable() {
     }
 
     if (on_datagram_) {
+      // buf 在本次循环的栈上，仅借给回调使用。
       on_datagram_(on_user_, from, buf, (size_t)n);
     }
   }

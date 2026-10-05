@@ -5,6 +5,8 @@
 #include "lab/net/NetStub.h"
 #include <cstdint>
 
+// 离线教学辅助：脚本输入录制一遍，再按相同固定步长回放比较哈希。
+// 在线客户端/服务端入口不调用此类，实际回滚历史使用 StateHistory。
 class FixedTimestepRunner {
 public:
   struct Config {
@@ -12,22 +14,22 @@ public:
     double maxFrameTime = 0.25;    // clamp，防止死亡螺旋
     Tick   maxTicksToRun = 600;    // demo：跑 10 秒（60*10）
     size_t inputBufferCap = 2048;  // 输入环形缓冲容量
-    size_t snapshotCap = 2048;     // 状态快照容量（为回滚预留）
+    size_t snapshotCap = 2048;     // 教学用快照环容量，当前不执行回滚
   };
 
   explicit FixedTimestepRunner(const Config& cfg);
 
-  // 运行一次 demo（内部会跑 fixed timestep）
+  // 运行固定帧录制和回放，将逐帧哈希比较结果写入日志。
   void Run();
 
 private:
-  // 采样本地输入：你可以接 SDL/GLFW/控制台输入
+  // 生成可重复的脚本输入，不读取 SDL 或真实键盘。
   InputCmd SampleLocalInput(Tick tick);
 
   // tick 级：取输入->仿真->存快照/hash
   void SimTick(Tick tick);
 
-  // 为回滚预留：保存快照（ring buffer）
+  // 保存教学快照到环形缓冲；当前 Run 不读取该历史。
   void SaveSnapshot(const WorldSnapshot& s);
 
 private:
@@ -35,12 +37,12 @@ private:
   InputBuffer inputBuf_;
   lab::sim::World world_;
   RecordReplay rr_;
-  NetStub net_;
+  NetStub net_; // 保留的教学占位，Run 当前不使用网络
 
-  // 快照 ring：用于未来 rollback
+  // 教学快照环；在线预测与校正不经过这里。
   struct SnapSlot { bool valid=false; WorldSnapshot s{}; };
   std::vector<SnapSlot> snaps_;
 
-  // hash 日志用于验收 determinism
+  // 两次运行的逐帧哈希，用于检查同环境下的可重复性。
   std::vector<uint64_t> hashes_;
 };

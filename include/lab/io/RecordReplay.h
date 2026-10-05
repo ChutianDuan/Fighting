@@ -2,6 +2,7 @@
 #include "lab/sim/InputCmd.h"
 #include <vector>
 
+// 仅在内存中保存输入的教学辅助，不提供回放文件或完整对局状态持久化。
 class RecordReplay {
 public:
   void StartRecord();
@@ -12,7 +13,7 @@ public:
 
   void PushRecorded(const InputCmd& cmd);
 
-  // 回放：按 tick 取输入；如果不足返回默认
+  // tick 直接作为数组下标，要求从 0 连续录制；非回放模式或越界返回空输入。
   InputCmd GetReplayOrDefault(Tick tick) const;
 
   // 录制数据暴露给外部做二次运行比较（可选）

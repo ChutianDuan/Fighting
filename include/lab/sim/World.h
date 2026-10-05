@@ -15,10 +15,14 @@ class World {
 public:
     explicit World(size_t numPlayers = 1);
 
-    // 多人 Step：cmds.size() 必须 == players_.size()
+    // 每帧命令数须等于 NumPlayers()，各命令 tick 须一致；成功推进后快照标记该 tick。
+    // dt 由调用方固定为 1/60 秒，在线预测、权威推进和重放共用同一实现。
     void Step(const std::vector<InputCmd>& cmds, float dt);
 
     WorldSnapshot Snapshot() const;
+    // 内部只读状态已在 Step/Restore 后同步；引用不能跨下一次世界修改持有。
+    const WorldSnapshot& View() const { return snap_; }
+    // 恢复地图、弹道和最近瞄准方向，不能只覆盖玩家的位置与 HP。
     void Restore(const WorldSnapshot& s);
     void SetMazeSeed(uint32_t seed, bool resetPlayers = false);
 
@@ -34,7 +38,7 @@ private:
     std::vector<Projectile> projectiles_;
     std::vector<float> lastDirX_;
     std::vector<float> lastDirY_;
-    std::vector<uint8_t> maze_; // 0 free, 1 wall
+    std::vector<uint8_t> maze_; // 0 通路、1 墙体
     uint32_t mazeW_ = 15;
     uint32_t mazeH_ = 15;
     uint32_t mazeSeed_ = 12345;

@@ -7,7 +7,7 @@
 #include <event2/event.h>
 #include <event2/util.h>
 
-// 前置声明（避免头文件引入 libevent 过多）
+// libevent 事件类型；此头文件同时使用其回调参数类型。
 struct event_base;
 struct event;
 
@@ -21,8 +21,10 @@ struct UdpAddr {
   uint64_t Key() const;
 };
 
+// 拥有 fd 和读事件，借用 event_base；应在 base 释放前停止读事件。
 class UdpSocket {
 public:
+  // data 指向接收栈缓冲，只在回调期间有效，调用方需当场解码或复制。
   using OnDatagramFn = void(*)(void* user, const UdpAddr& from, const uint8_t* data, size_t len);
 
   UdpSocket() = default;
@@ -33,21 +35,21 @@ public:
   bool Open();
   bool Bind(uint16_t port, const std::string& bindIp = "0.0.0.0");
 
-  bool SetNonBlocking(bool on);   // 仍保留（内部实现可以换成 evutil）
+  bool SetNonBlocking(bool on);
   bool SetRecvBuf(int bytes);
   bool SetSendBuf(int bytes);
 
   bool SendTo(const UdpAddr& to, const uint8_t* data, size_t len);
   bool SendTo(const UdpAddr& to, const std::vector<uint8_t>& buf);
 
-  // 保留原“手动轮询收包”接口（可选）
+  // 手动轮询用于无界面测试；false 同时涵盖无数据和接收错误。
   bool RecvFrom(UdpAddr& from, std::vector<uint8_t>& out);
 
   int fd() const { return fd_; }
   uint16_t LocalPort() const;
 
   // ---------------- libevent 集成 ----------------
-  // 将该 UDP socket 注册到 event_base；收到任何 datagram 时触发回调
+  // 注册到借用的 event_base；收到数据报后串行调用 fn，不额外创建线程。
   bool StartEventRead(event_base* base, OnDatagramFn fn, void* user);
 
   // 解除事件注册（可重复调用）

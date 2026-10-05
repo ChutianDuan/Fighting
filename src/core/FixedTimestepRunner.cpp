@@ -12,8 +12,7 @@ FixedTimestepRunner::FixedTimestepRunner(const Config& cfg)
     snaps_(cfg.snapshotCap == 0 ? 1 : cfg.snapshotCap) {}
 
 InputCmd FixedTimestepRunner::SampleLocalInput(Tick tick) {
-  // Lab0~Lab1：为了可重复测试，给一个确定性的“脚本输入”
-  // 例如：前 120 tick 向右，后 120 tick 向左，其余不动
+  // 可重复的脚本输入：前 120 帧向右，后 120 帧向左，其余不动。
   InputCmd cmd;
   cmd.tick = tick;
 
@@ -32,15 +31,15 @@ void FixedTimestepRunner::SaveSnapshot(const WorldSnapshot& s) {
 }
 
 void FixedTimestepRunner::SimTick(Tick tick) {
-  // 1) 采样本地输入（后续：本地输入 + 远端输入）
+  // 1) 生成离线脚本输入。
   InputCmd local = SampleLocalInput(tick);
 
-  // 2) 录制（用于 determinism 验收）
+  // 2) 录制输入，供第二次运行验证可重复性。
   if (rr_.IsRecording()) {
     rr_.PushRecorded(local);
   }
 
-  // 3) 写入输入缓冲（后续：网络收到的也 Put）
+  // 3) 使用与在线输入历史相同的按帧缓冲结构。
   inputBuf_.Put(local);
 
   // 4) 本步仿真：缺失则 default（回滚/丢包时会用到）
@@ -49,7 +48,7 @@ void FixedTimestepRunner::SimTick(Tick tick) {
   // 5) 进行固定 dt 仿真
   world_.Step(std::vector<InputCmd>{cmd}, float(cfg_.dt));
 
-  // 6) 保存快照（回滚地基）
+  // 6) 保存教学快照，在线回滚使用独立的 StateHistory。
   const WorldSnapshot snap = world_.Snapshot();
   SaveSnapshot(snap);
 
@@ -82,8 +81,7 @@ void FixedTimestepRunner::Run() {
     if (frameTime > cfg_.maxFrameTime) frameTime = cfg_.maxFrameTime;
     acc += frameTime;
 
-    // 模拟渲染负载抖动（可注释）：验证 fixed timestep 仍然稳定
-    // BusySleepMs(3);
+    // 固定步长内层循环消耗累计时间，外层不参与世界积分。
 
     while (acc >= cfg_.dt && tick < cfg_.maxTicksToRun) {
       SimTick(tick);
@@ -91,8 +89,7 @@ void FixedTimestepRunner::Run() {
       acc -= cfg_.dt;
     }
 
-    // 渲染插值 alpha（这里不做实际渲染，保留接口概念）
-    // double alpha = acc / cfg_.dt;
+    // 此离线路径不渲染，不使用剩余累计时间做视觉插值。
   }
 
   // 备份第一遍 hashes

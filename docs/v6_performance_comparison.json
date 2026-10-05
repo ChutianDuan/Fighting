@@ -1,0 +1,383 @@
+{
+  "protocol": 6,
+  "machine": {
+    "system": "Darwin",
+    "node": "chutiandeMacBook-Air.local",
+    "release": "27.0.0",
+    "version": "Darwin Kernel Version 27.0.0: Tue Aug 11 21:02:59 PDT 2026; root:xnu-13432.1.9~1/RELEASE_ARM64_T8142",
+    "machine": "arm64"
+  },
+  "hardware": "hw.model: Mac17,3\nhw.memsize: 17179869184\nhw.ncpu: 10\nmachdep.cpu.brand_string: Apple M5",
+  "macOS": "27.0.1 (26A434)",
+  "beforeSha256": "2b1e6098d2894397fcb71433a2a724f2a18d4cae1c1827f1f7d641c72993030f",
+  "afterSha256": "4a76267049bb3d2c9dae68f2e88b4d5165cdae3ebb98063f84b577bf00d33e64",
+  "comparison": [
+    {
+      "mode": "core",
+      "rooms": 1,
+      "beforeMedian": {
+        "tickP50Ms": 0.062333,
+        "tickP95Ms": 0.107875,
+        "tickP99Ms": 0.1195,
+        "serverTickP99Ms": 0.0,
+        "allocations": 2013140,
+        "peakRssBytes": 9682944,
+        "bandwidthBytesPerSecond": 133969.53333333333,
+        "receivedInputDatagramsPerSecond": 120.06666666666666,
+        "appliedInputsPerSecond": 120.0,
+        "ackRttP50Ms": 0.0,
+        "ackRttP99Ms": 16.641374999380787,
+        "inputBytes": 1700457,
+        "outputBytes": 2319348
+      },
+      "afterMedian": {
+        "tickP50Ms": 0.058125,
+        "tickP95Ms": 0.098125,
+        "tickP99Ms": 0.121958,
+        "serverTickP99Ms": 0.0,
+        "allocations": 1877869,
+        "peakRssBytes": 9682944,
+        "bandwidthBytesPerSecond": 134068.76666666666,
+        "receivedInputDatagramsPerSecond": 120.06666666666666,
+        "appliedInputsPerSecond": 120.0,
+        "ackRttP50Ms": 0.0,
+        "ackRttP99Ms": 16.645333000269602,
+        "inputBytes": 1700473,
+        "outputBytes": 2321590
+      },
+      "changePct": {
+        "tickP50Ms": -6.75083823977668,
+        "tickP95Ms": -9.038238702201618,
+        "tickP99Ms": 2.0569037656903877,
+        "allocations": -6.71940351888095,
+        "peakRssBytes": 0.0,
+        "bandwidthBytesPerSecond": 0.07407156751559896,
+        "receivedInputDatagramsPerSecond": 0.0,
+        "appliedInputsPerSecond": 0.0,
+        "ackRttP99Ms": 0.023784097702028717,
+        "inputBytes": 0.0009409235282031858,
+        "outputBytes": 0.09666509726009576
+      },
+      "beforeP99Runs": [
+        0.121125,
+        0.118958,
+        0.1195
+      ],
+      "afterP99Runs": [
+        0.226167,
+        0.121958,
+        0.104708
+      ],
+      "beforeMaxDeadlineMissPct": 0.0,
+      "afterMaxDeadlineMissPct": 0.0,
+      "budgetPassedAllRuns": true
+    },
+    {
+      "mode": "core",
+      "rooms": 16,
+      "beforeMedian": {
+        "tickP50Ms": 0.91125,
+        "tickP95Ms": 1.520708,
+        "tickP99Ms": 1.635666,
+        "serverTickP99Ms": 0.0,
+        "allocations": 32206297,
+        "peakRssBytes": 13287424,
+        "bandwidthBytesPerSecond": 2144009.8666666667,
+        "receivedInputDatagramsPerSecond": 1920.0,
+        "appliedInputsPerSecond": 1920.0,
+        "ackRttP50Ms": 0.0,
+        "ackRttP99Ms": 16.650625000693253,
+        "inputBytes": 27196336,
+        "outputBytes": 37124088
+      },
+      "afterMedian": {
+        "tickP50Ms": 0.863875,
+        "tickP95Ms": 1.442542,
+        "tickP99Ms": 1.484333,
+        "serverTickP99Ms": 0.0,
+        "allocations": 29987214,
+        "peakRssBytes": 11436032,
+        "bandwidthBytesPerSecond": 2142470.0,
+        "receivedInputDatagramsPerSecond": 1920.0,
+        "appliedInputsPerSecond": 1920.0,
+        "ackRttP50Ms": 0.0,
+        "ackRttP99Ms": 16.637499998978456,
+        "inputBytes": 27196336,
+        "outputBytes": 37092950
+      },
+      "changePct": {
+        "tickP50Ms": -5.1989026063100185,
+        "tickP95Ms": -5.140105792828075,
+        "tickP99Ms": -9.252072244578057,
+        "allocations": -6.890214668268135,
+        "peakRssBytes": -13.933415536374849,
+        "bandwidthBytesPerSecond": -0.07182180878023692,
+        "receivedInputDatagramsPerSecond": 0.0,
+        "appliedInputsPerSecond": 0.0,
+        "ackRttP99Ms": -0.0788258801951991,
+        "inputBytes": 0.0,
+        "outputBytes": -0.0838754611291681
+      },
+      "beforeP99Runs": [
+        1.635666,
+        1.626667,
+        1.655166
+      ],
+      "afterP99Runs": [
+        1.484333,
+        1.506417,
+        1.47975
+      ],
+      "beforeMaxDeadlineMissPct": 0.0,
+      "afterMaxDeadlineMissPct": 0.0,
+      "budgetPassedAllRuns": true
+    },
+    {
+      "mode": "core",
+      "rooms": 64,
+      "beforeMedian": {
+        "tickP50Ms": 3.578666,
+        "tickP95Ms": 6.060125,
+        "tickP99Ms": 6.279292,
+        "serverTickP99Ms": 0.0,
+        "allocations": 128731046,
+        "peakRssBytes": 42811392,
+        "bandwidthBytesPerSecond": 8580342.866666667,
+        "receivedInputDatagramsPerSecond": 7680.0,
+        "appliedInputsPerSecond": 7680.0,
+        "ackRttP50Ms": 0.0,
+        "ackRttP99Ms": 16.63870899938047,
+        "inputBytes": 108994144,
+        "outputBytes": 148356178
+      },
+      "afterMedian": {
+        "tickP50Ms": 3.46625,
+        "tickP95Ms": 5.817,
+        "tickP99Ms": 6.048958,
+        "serverTickP99Ms": 0.0,
+        "allocations": 119872418,
+        "peakRssBytes": 34537472,
+        "bandwidthBytesPerSecond": 8575774.133333333,
+        "receivedInputDatagramsPerSecond": 7680.0,
+        "appliedInputsPerSecond": 7680.0,
+        "ackRttP50Ms": 0.0,
+        "ackRttP99Ms": 16.647915999783436,
+        "inputBytes": 108993120,
+        "outputBytes": 148339428
+      },
+      "changePct": {
+        "tickP50Ms": -3.14128225433723,
+        "tickP95Ms": -4.01188094304985,
+        "tickP99Ms": -3.668152396798874,
+        "allocations": -6.881500830809683,
+        "peakRssBytes": -19.326444699579028,
+        "bandwidthBytesPerSecond": -0.0532465124567838,
+        "receivedInputDatagramsPerSecond": 0.0,
+        "appliedInputsPerSecond": 0.0,
+        "ackRttP99Ms": 0.05533482437434234,
+        "inputBytes": -0.0009395000157064182,
+        "outputBytes": -0.0112903960089894
+      },
+      "beforeP99Runs": [
+        6.234542,
+        6.292208,
+        6.279292
+      ],
+      "afterP99Runs": [
+        6.048958,
+        5.953583,
+        6.2645
+      ],
+      "beforeMaxDeadlineMissPct": 0.0,
+      "afterMaxDeadlineMissPct": 0.0,
+      "budgetPassedAllRuns": true
+    },
+    {
+      "mode": "udp",
+      "rooms": 1,
+      "beforeMedian": {
+        "tickP50Ms": 0.08725,
+        "tickP95Ms": 0.143834,
+        "tickP99Ms": 0.176875,
+        "serverTickP99Ms": 0.057792,
+        "allocations": 2020367,
+        "peakRssBytes": 9682944,
+        "bandwidthBytesPerSecond": 134040.53333333333,
+        "receivedInputDatagramsPerSecond": 119.96666666666667,
+        "appliedInputsPerSecond": 120.0,
+        "ackRttP50Ms": 16.712041000573663,
+        "ackRttP99Ms": 49.97870799888915,
+        "inputBytes": 1699498,
+        "outputBytes": 2321690
+      },
+      "afterMedian": {
+        "tickP50Ms": 0.0735,
+        "tickP95Ms": 0.138084,
+        "tickP99Ms": 0.1585,
+        "serverTickP99Ms": 0.052708,
+        "allocations": 1876857,
+        "peakRssBytes": 9682944,
+        "bandwidthBytesPerSecond": 133883.46666666667,
+        "receivedInputDatagramsPerSecond": 120.0,
+        "appliedInputsPerSecond": 120.0,
+        "ackRttP50Ms": 33.2985839995672,
+        "ackRttP99Ms": 50.05062500094937,
+        "inputBytes": 1699516,
+        "outputBytes": 2316980
+      },
+      "changePct": {
+        "tickP50Ms": -15.759312320916907,
+        "tickP95Ms": -3.9976639737475006,
+        "tickP99Ms": -10.3886925795053,
+        "serverTickP99Ms": -8.797065337763021,
+        "allocations": -7.103164920036809,
+        "peakRssBytes": 0.0,
+        "bandwidthBytesPerSecond": -0.11717848531388464,
+        "receivedInputDatagramsPerSecond": 0.02778549597111102,
+        "appliedInputsPerSecond": 0.0,
+        "ackRttP50Ms": 99.24905640444624,
+        "ackRttP99Ms": 0.14389528048988076,
+        "inputBytes": 0.001059136286118978,
+        "outputBytes": -0.20286946146987894
+      },
+      "beforeP99Runs": [
+        0.176875,
+        0.177417,
+        0.1695
+      ],
+      "afterP99Runs": [
+        0.157875,
+        0.158583,
+        0.1585
+      ],
+      "beforeMaxDeadlineMissPct": 0.0,
+      "afterMaxDeadlineMissPct": 0.0,
+      "budgetPassedAllRuns": true
+    },
+    {
+      "mode": "udp",
+      "rooms": 16,
+      "beforeMedian": {
+        "tickP50Ms": 1.085625,
+        "tickP95Ms": 1.253583,
+        "tickP99Ms": 2.4065,
+        "serverTickP99Ms": 0.772833,
+        "allocations": 32373112,
+        "peakRssBytes": 13582336,
+        "bandwidthBytesPerSecond": 2153540.7333333334,
+        "receivedInputDatagramsPerSecond": 1920.0,
+        "appliedInputsPerSecond": 1920.0,
+        "ackRttP50Ms": 16.65816700005962,
+        "ackRttP99Ms": 16.783249999207328,
+        "inputBytes": 27196048,
+        "outputBytes": 37410174
+      },
+      "afterMedian": {
+        "tickP50Ms": 1.041292,
+        "tickP95Ms": 1.149167,
+        "tickP99Ms": 1.547542,
+        "serverTickP99Ms": 0.579833,
+        "allocations": 30214131,
+        "peakRssBytes": 11698176,
+        "bandwidthBytesPerSecond": 2153540.7333333334,
+        "receivedInputDatagramsPerSecond": 1920.0,
+        "appliedInputsPerSecond": 1920.0,
+        "ackRttP50Ms": 16.656707999572973,
+        "ackRttP99Ms": 16.77758299956622,
+        "inputBytes": 27196048,
+        "outputBytes": 37410174
+      },
+      "changePct": {
+        "tickP50Ms": -4.08363845710995,
+        "tickP95Ms": -8.329404594669832,
+        "tickP99Ms": -35.693247454809885,
+        "serverTickP99Ms": -24.973053686889656,
+        "allocations": -6.669056098159487,
+        "peakRssBytes": -13.872135102533168,
+        "bandwidthBytesPerSecond": 0.0,
+        "receivedInputDatagramsPerSecond": 0.0,
+        "appliedInputsPerSecond": 0.0,
+        "ackRttP50Ms": -0.00875846956416293,
+        "ackRttP99Ms": -0.03376580603503543,
+        "inputBytes": 0.0,
+        "outputBytes": 0.0
+      },
+      "beforeP99Runs": [
+        2.4065,
+        1.216875,
+        2.545667
+      ],
+      "afterP99Runs": [
+        1.547542,
+        1.619792,
+        1.187
+      ],
+      "beforeMaxDeadlineMissPct": 0.0,
+      "afterMaxDeadlineMissPct": 0.0,
+      "budgetPassedAllRuns": true
+    },
+    {
+      "mode": "udp",
+      "rooms": 64,
+      "beforeMedian": {
+        "tickP50Ms": 4.277208,
+        "tickP95Ms": 4.509208,
+        "tickP99Ms": 4.710584,
+        "serverTickP99Ms": 2.372667,
+        "allocations": 129051530,
+        "peakRssBytes": 43024384,
+        "bandwidthBytesPerSecond": 8603819.6,
+        "receivedInputDatagramsPerSecond": 7680.0,
+        "appliedInputsPerSecond": 7680.0,
+        "ackRttP50Ms": 16.66737499908777,
+        "ackRttP99Ms": 16.77587499943911,
+        "inputBytes": 108992992,
+        "outputBytes": 149121596
+      },
+      "afterMedian": {
+        "tickP50Ms": 4.139166,
+        "tickP95Ms": 4.472042,
+        "tickP99Ms": 4.677166,
+        "serverTickP99Ms": 2.338666,
+        "allocations": 120479418,
+        "peakRssBytes": 35225600,
+        "bandwidthBytesPerSecond": 8603819.6,
+        "receivedInputDatagramsPerSecond": 7680.0,
+        "appliedInputsPerSecond": 7680.0,
+        "ackRttP50Ms": 16.667791998770554,
+        "ackRttP99Ms": 16.77762500003155,
+        "inputBytes": 108992992,
+        "outputBytes": 149121596
+      },
+      "changePct": {
+        "tickP50Ms": -3.2273857151674523,
+        "tickP95Ms": -0.8242245644911494,
+        "tickP99Ms": -0.7094237147665772,
+        "serverTickP99Ms": -1.4330287393890528,
+        "allocations": -6.642394708532318,
+        "peakRssBytes": -18.12642802741813,
+        "bandwidthBytesPerSecond": 0.0,
+        "receivedInputDatagramsPerSecond": 0.0,
+        "appliedInputsPerSecond": 0.0,
+        "ackRttP50Ms": 0.0025018917664487716,
+        "ackRttP99Ms": 0.010431650167253004,
+        "inputBytes": 0.0,
+        "outputBytes": 0.0
+      },
+      "beforeP99Runs": [
+        4.650333,
+        4.710584,
+        5.194708
+      ],
+      "afterP99Runs": [
+        4.528833,
+        4.677166,
+        10.496375
+      ],
+      "beforeMaxDeadlineMissPct": 0.0,
+      "afterMaxDeadlineMissPct": 0.16666666666666666,
+      "budgetPassedAllRuns": false
+    }
+  ],
+  "scope": "whole synchronous harness, recording off, 256-frame bot histories; core excludes sockets; measured costs are not deterministic"
+}

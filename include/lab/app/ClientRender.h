@@ -18,6 +18,9 @@ struct RenderCtx {
 };
 
 struct NetworkStats {
+  int targetLead=2;
+  double displayDelayMs=100;
+  std::string status,detail;
   double rttMs = 0.0;
   double packetLossPct = 0.0;
   int32_t inputLeadTicks = 0;

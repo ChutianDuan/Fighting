@@ -5,7 +5,7 @@
 namespace lab::app {
 
 int8_t PredictMoveXFromState(const lab::net::PackedPlayerState& ps, int8_t lastMoveX) {
-  if (ps.action == 2) return 0; // Hitstun
+  if (ps.action == 2) return 0; // 硬直时不预测移动意图
 
   constexpr float eps = 0.02f;
   constexpr float stopEps = 0.005f;
@@ -18,7 +18,7 @@ int8_t PredictMoveXFromState(const lab::net::PackedPlayerState& ps, int8_t lastM
 }
 
 int8_t PredictMoveYFromState(const lab::net::PackedPlayerState& ps, int8_t lastMoveY) {
-  if (ps.action == 2) return 0; // Hitstun
+  if (ps.action == 2) return 0; // 硬直时不预测移动意图
 
   constexpr float eps = 0.02f;
   constexpr float stopEps = 0.005f;

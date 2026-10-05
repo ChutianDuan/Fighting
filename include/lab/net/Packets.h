@@ -1,9 +1,10 @@
 #pragma once
+// 旧教学测试的数据格式；实际客户端/服务端只使用 session/Protocol.h 的 v6。
 #include <cstdint>
 #include <vector>
 #include <optional>
 
-#include <lab/sim/InputCmd.h> // 复用你的 Tick / InputCmd
+#include <lab/sim/InputCmd.h> // 网络与模拟共用帧号和输入数据结构
 
 namespace lab::net {
 
@@ -26,6 +27,7 @@ struct PacketHeader {
 };
 #pragma pack(pop)
 
+// 位置以毫米、速度以毫米/秒传输；其余字段同样参与快照恢复与哈希。
 struct PackedPlayerState {
   int32_t x_mm = 0;
   int32_t v_mm = 0;
@@ -52,33 +54,34 @@ struct PackedProjectile {
   uint8_t life = 0;
 };
 
-// 发送端：每包带最近 K 个 tick 的输入（冗余）
+// 上行只传输入。在线客户端每包带最近 K 帧；空 cmds 用作 hello/Start 重试。
 struct InputPacket {
   uint8_t  playerId = 1;
-  uint8_t  count = 0;            // cmd 数量
+  uint8_t  count = 0;            // 编码器以 cmds.size()（最多 255）决定实际上行数量
   uint16_t reserved = 0;
-  uint64_t sessionId = 0;        // Start 分配；hello 阶段为 0
+  uint64_t sessionId = 0;        // 首次 hello 为 0，Start 告知；Reset 后 hello 可保留原会话
   uint32_t matchId = 0;          // 未进入比赛时为 0
   uint32_t seq = 0;              // 输入序号，用于检测丢包
   Tick newestTick = 0; // 本包最新 tick
-  Tick clientAckServerTick = 0; // 客户端确认的 server tick（预留给后续回滚/状态）
+  Tick clientAckServerTick = 0; // 最近收到 ACK 的服务端帧号；服务端当前未消费此字段
   std::vector<InputCmd> cmds;    // cmds[i].tick 必须有效
 };
 
-// Server -> Client ACK（最小闭环）
+// 下行 ACK 确认服务端进度并提供统计，不直接携带可恢复的世界状态。
 struct AckPacket {
   uint8_t  playerId = 1;
   uint8_t  reserved[3] = {0,0,0};
   uint64_t sessionId = 0;
   uint32_t matchId = 0;
   Tick serverTickProcessed = 0;   // server 权威推进到的 tick
-  Tick serverLastInputTick = 0;   // server 已收到该 client 的最大输入 tick
-  uint64_t serverStateHash = 0;             // 可选：debug 用（一致性/分叉定位）
+  Tick serverLastInputTick = 0;   // 最大已收到输入帧，可能尚未模拟，不是逐帧应用确认
+  uint64_t serverStateHash = 0;             // 与已完成帧对应的权威哈希，用于一致性诊断
   uint32_t serverRecvInputSeq = 0;           // server 已收到该 client 的最新 input packet seq
   uint32_t serverInputPacketsReceived = 0;   // 累计收到的 input packet 数（不含 hello）
   uint32_t serverInputPacketsLost = 0;       // 基于 seq gap 的累计丢包估计
 };
 
+// 周期性全量玩家/弹道状态；迷宫网格只在 Start 传输，State 用 seed 关联地图。
 struct StatePacket{
   uint8_t playerId = 1;
   uint8_t playerCount = 0; // 有效玩家数量
@@ -93,13 +96,14 @@ struct StatePacket{
   uint32_t mazeSeed = 0;
 };
 
+// 同局 Start 可重发；sessionId 标识连接，matchId 隔离比赛，playerId 指定槽位。
 struct StartPacket {
   uint8_t playerId = 1;
   uint8_t totalPlayers = 2;
   uint16_t reserved = 0;
   uint64_t sessionId = 0;
   uint32_t matchId = 0;
-  Tick startTick = 0;
+  Tick startTick = 0; // 下一帧输入的编号，不是墙钟开始时间或倒计时长度
   uint32_t mazeSeed = 0;
   uint16_t mazeWidth = 0;
   uint16_t mazeHeight = 0;

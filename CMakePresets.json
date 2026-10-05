@@ -1,0 +1,89 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 25,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "vcpkg-base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "environment": {
+        "CCACHE_DIR": "/Volumes/chutian/opt/ccache",
+        "PATH": "/Volumes/chutian/opt/conda/envs/dev/bin:$penv{PATH}",
+        "VCPKG_DEFAULT_BINARY_CACHE": "/Volumes/chutian/opt/vcpkg-cache/binaries",
+        "VCPKG_ROOT": "/Volumes/chutian/opt/vcpkg",
+        "VCPKG_DOWNLOADS": "/Volumes/chutian/opt/vcpkg-cache/downloads",
+        "VCPKG_DISABLE_METRICS": "1"
+      },
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "/usr/bin/clang++",
+        "CMAKE_CXX_COMPILER_LAUNCHER": "ccache",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": true,
+        "CMAKE_MAKE_PROGRAM": "/Volumes/chutian/opt/conda/envs/dev/bin/ninja",
+        "CMAKE_OSX_ARCHITECTURES": "arm64",
+        "CMAKE_TOOLCHAIN_FILE": "/Volumes/chutian/opt/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_HOST_TRIPLET": "arm64-osx",
+        "VCPKG_INSTALLED_DIR": "${sourceDir}/build/vcpkg_installed",
+        "VCPKG_TARGET_TRIPLET": "arm64-osx"
+      }
+    },
+    {
+      "name": "vcpkg-debug",
+      "displayName": "vcpkg Debug",
+      "inherits": "vcpkg-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "vcpkg-release",
+      "displayName": "vcpkg Release",
+      "inherits": "vcpkg-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "build-debug",
+      "configurePreset": "vcpkg-debug",
+      "jobs": 10
+    },
+    {
+      "name": "build-release",
+      "configurePreset": "vcpkg-release",
+      "jobs": 10
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "test-debug",
+      "configurePreset": "vcpkg-debug",
+      "output": {
+        "outputOnFailure": true
+      },
+      "filter": {
+        "exclude": {
+          "label": "performance"
+        }
+      }
+    },
+    {
+      "name": "test-release",
+      "configurePreset": "vcpkg-release",
+      "output": {
+        "outputOnFailure": true
+      },
+      "filter": {
+        "exclude": {
+          "label": "performance"
+        }
+      }
+    }
+  ]
+}

@@ -29,6 +29,7 @@ bool InitRenderer(RenderCtx& rc, const std::string& title, const std::string& fo
                                SDL_WINDOW_SHOWN);
   if (!rc.window) return false;
   rc.renderer = SDL_CreateRenderer(rc.window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+  if (!rc.renderer) rc.renderer = SDL_CreateRenderer(rc.window, -1, SDL_RENDERER_SOFTWARE);
   if (!rc.renderer) return false;
   rc.font = TTF_OpenFont(fontPath.c_str(), fontSize);
   return rc.font != nullptr;
@@ -136,14 +137,16 @@ void RenderFrame(RenderCtx& rc,
 
     if (netStats) {
       const int x = std::max(10, rc.width - 275);
+      drawText(10, rc.height-60, netStats->status + " | target lead " + std::to_string(netStats->targetLead) +
+               " | display delay " + fixed1(netStats->displayDelayMs) + " ms");
+      drawText(10, rc.height-40, netStats->detail);
       drawText(x, 10, "rtt: " + fixed1(netStats->rttMs) + " ms");
-      drawText(x, 30, "loss: " + fixed1(netStats->packetLossPct) + "%");
+      drawText(x, 30, "sync: " + netStats->status);
       drawText(x, 50, "lead: " + std::to_string(netStats->inputLeadTicks) + " ticks");
       drawText(x, 70, "state delay: " + std::to_string(netStats->stateDelayTicks) + " ticks");
       drawText(x, 90, "replay: " + std::to_string(netStats->replayTicks) +
                          " ticks / " + fixed1(netStats->replayCostMs) + " ms");
-      drawText(x, 110, "input pkts: " + std::to_string(netStats->inputPacketsReceived) +
-                          " recv / " + std::to_string(netStats->inputPacketsLost) + " lost");
+      drawText(x, 110, "reply pkts: " + std::to_string(netStats->inputPacketsReceived));
     }
   }
 

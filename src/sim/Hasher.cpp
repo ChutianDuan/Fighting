@@ -42,11 +42,14 @@ void MixU64(uint64_t& h, uint64_t v) {
 }
 
 int32_t QuantizeMm(float v) {
+  // 与服务端 State 的位置/速度打包一致，避免网络量化后的 float 产生假分叉。
   return static_cast<int32_t>(std::lround(v * 1000.0f));
 }
 }
 
 uint64_t Hasher::Hash(const WorldSnapshot& s) {
+  // 固定字段顺序逐字节混合，不读取结构体填充或直接混合原始浮点内存。
+  // 这是状态一致性诊断值，不提供报文认证，也不保证跨平台浮点推进完全一致。
   uint64_t h = kFnvOffset;
 
   MixU32(h, s.tick);
